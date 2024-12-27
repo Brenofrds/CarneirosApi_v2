@@ -1,6 +1,6 @@
 # Carneiros API Jestor Novo
 
-Este projeto é uma API construída para integrar dados entre a API da **Stays** e a API da **Jestor**, com manipulação e armazenamento de dados em um banco de dados gerenciado pelo Prisma.
+Este projeto é uma API desenvolvida para integrar dados entre a API da **Stays** e a API da **Jestor**, com manipulação e armazenamento de informações em um banco de dados gerenciado pelo Prisma.
 
 ---
 
@@ -9,55 +9,76 @@ Este projeto é uma API construída para integrar dados entre a API da **Stays**
 ### **Raiz do Projeto**
 - **`package.json`**: Lista as dependências do projeto e define scripts para execução.
 - **`tsconfig.json`**: Configurações do TypeScript.
-- **`.env`**: Arquivo de variáveis de ambiente, onde estão as chaves de API e URLs sensíveis.
-- **`README.md`**: Documento explicando a estrutura do projeto.
+- **`.env`**: Arquivo de variáveis de ambiente, onde estão armazenadas as chaves de API, URLs sensíveis e outras configurações.
+- **`README.md`**: Documento explicativo da estrutura do projeto.
+
+---
 
 ### **Diretório `prisma/`**
-- **`schema.prisma`**: Arquivo que define os modelos e configurações do banco de dados.
-- **`migrations/`**: Armazena as migrações geradas pelo Prisma.
+- **`schema.prisma`**: Define os modelos de dados e configurações do banco de dados usado pelo Prisma.
+- **`migrations/`**: Armazena as migrações geradas pelo Prisma para manter o banco de dados sincronizado com os modelos definidos.
+
+---
 
 ### **Diretório `src/`**
 
 #### **Subdiretório `config/`**
-Arquivos de configuração e conexão com APIs externas:
-- **`database.ts`**: Configuração do Prisma Client para conexão com o banco de dados.
-- **`staysClient.ts`**: Configuração do cliente Axios para a API da Stays.
-- **`jestorClient.ts`**: Configuração do cliente Axios para a API do Jestor.
+Armazena arquivos de configuração e conexão com serviços externos:
+- **`database.ts`**: Configuração do Prisma Client para gerenciar a conexão com o banco de dados.
+- **`staysClient.ts`**: Configuração do cliente Axios para realizar requisições à API da Stays.
+- **`jestorClient.ts`**: Configuração do cliente Axios para realizar requisições à API da Jestor.
+
+---
 
 #### **Subdiretório `modules/`**
 Cada módulo contém controladores, serviços e tipos específicos:
+
+- **`database/`**:
+  - **`models.ts`**: Define modelos e estruturas de dados internos do projeto.
+  - **`seed.ts`**: Script para popular o banco de dados com dados iniciais (seed).
+
 - **`stays/`**:
-  - **`stays.controller.ts`**: Gerencia as requisições HTTP relacionadas à Stays.
-  - **`stays.service.ts`**: Contém a lógica de interação com a API da Stays.
-  - **`stays.types.ts`**: Define as interfaces e tipos utilizados no módulo.
+  - **`stays.controller.ts`**: Gerencia as requisições HTTP relacionadas à API da Stays.
+  - **`stays.service.ts`**: Contém a lógica de interação com a API da Stays, como busca de dados.
+  - **`stays.types.ts`**: Define interfaces e tipos usados no módulo Stays.
+
 - **`jestor/`**:
-  - **`jestor.controller.ts`**: Gerencia as requisições HTTP relacionadas à Jestor.
-  - **`jestor.service.ts`**: Contém a lógica de interação com a API da Jestor.
-  - **`jestor.types.ts`**: Define as interfaces e tipos utilizados no módulo.
+  - **`jestor.controller.ts`**: Gerencia as requisições HTTP relacionadas à API da Jestor.
+  - **`jestor.service.ts`**: Contém a lógica de interação com a API da Jestor, como envio de dados tratados.
+  - **`jestor.types.ts`**: Define interfaces e tipos usados no módulo Jestor.
+
+---
 
 #### **Subdiretório `utils/`**
-- **`dataTransform.ts`**: Funções para transformação de dados.
+- **`dataTransform.ts`**: Contém funções utilitárias para transformação de dados entre formatos, utilizados na integração entre APIs.
+
+---
+
+#### **Subdiretório `tests/`**
+- Reservado para testes automatizados do projeto (atualmente vazio).
+
+---
 
 #### **Arquivos de Entrada**
-- **`app.ts`**: Configura e inicializa o servidor Express.
-- **`index.ts`**: Ponto de entrada do projeto.
+- **`app.ts`**: Configura e inicializa o servidor Express e os middlewares principais.
+- **`index.ts`**: Ponto de entrada do projeto, responsável por inicializar o servidor.
 
 ---
 
 ## **Fluxo de Funcionamento**
 
 1. **Conexão com APIs**:
-   - **Stays**: O cliente `staysClient.ts` realiza requisições à API da Stays.
-   - **Jestor**: O cliente `jestorClient.ts` se comunica com a API da Jestor.
+   - **Stays**: O cliente `staysClient.ts` realiza requisições à API da Stays para obter dados como reservas e imóveis.
+   - **Jestor**: O cliente `jestorClient.ts` envia os dados tratados para a API da Jestor.
 
 2. **Requisições para a API da Stays**:
-   - O controlador `stays.controller.ts` chama funções do serviço `stays.service.ts` para buscar reservas ou outros dados necessários.
+   - O controlador `stays.controller.ts` chama funções do serviço `stays.service.ts` para buscar reservas e outros dados relevantes.
 
 3. **Envio de Dados para a API da Jestor**:
-   - Dados tratados são enviados à Jestor utilizando o módulo Jestor (`jestor.controller.ts` e `jestor.service.ts`).
+   - Dados tratados são enviados para a API da Jestor utilizando o módulo Jestor (`jestor.controller.ts` e `jestor.service.ts`).
 
 4. **Transformação de Dados**:
-   - Dados são tratados e preparados para envio ou armazenamento usando utilitários (`dataTransform.ts`).
+   - Os dados coletados são transformados para o formato esperado antes de serem enviados ou armazenados no banco de dados. Essas transformações ocorrem em `dataTransform.ts`.
 
 ---
 
@@ -65,5 +86,5 @@ Cada módulo contém controladores, serviços e tipos específicos:
 
 1. **Clone o Repositório**:
    ```bash
-   git clone <URL_DO_REPOSITORIO>
-   cd Carneiros-API-Jestor-Novo
+   git clone https://github.com/Brenofrds/CarneirosApi_v2.git
+   cd CarneirosApi_v2
