@@ -1,0 +1,159 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Proprietario {
+  id                  Int     @id @default(autoincrement())
+  cpf_cnpj            String  @db.VarChar(45) @unique
+  proprietario_principal String
+  email               String
+  imoveis             Imovel[]
+}
+
+model Condominio {
+  id                  Int     @id @default(autoincrement())
+  sku                 String  @db.VarChar(45) @unique
+  id_stays            String
+  atualizado_por      String
+  atualizado_em       DateTime @default(now())
+  imoveis             Imovel[]
+}
+
+model Imovel {
+  id             Int       @id @default(autoincrement())
+  sku            String    @db.VarChar(45) @unique
+  status         String
+  atualizadoPor  String
+  atualizadoEm   DateTime  @default(now())
+  proprietarioId Int
+  condominioId   Int
+
+  proprietario   Proprietario @relation(fields: [proprietarioId], references: [id])
+  condominio     Condominio   @relation(fields: [condominioId], references: [id])
+  bloqueios      Bloqueio[]
+  reservas       Reserva[]    // Relação adicionada com Reserva
+}
+
+model Bloqueio {
+  id                  Int     @id @default(autoincrement())
+  localizador         String  @db.Char(5) @unique
+  id_externo          String  @db.VarChar(45)
+  criado_em           DateTime @default(now())
+  atualizado_por      String  @db.VarChar(45)
+  check_in            DateTime @db.Date
+  check_out           DateTime @db.Date
+  hora_check_in       DateTime @db.Time
+  hora_check_out      DateTime @db.Time
+  nota_interno        String  @db.VarChar(255)
+  status              String  @db.VarChar(45)
+  imovelId            Int
+
+  imovel              Imovel  @relation(fields: [imovelId], references: [id])
+}
+
+model Canal {
+  id       Int       @id @default(autoincrement())
+  titulo   String    @db.VarChar(45)
+  codigo   String    @db.VarChar(50)
+
+  reservas Reserva[] // Relação adicionada com Reserva
+}
+
+model Agente {
+  id       Int       @id @default(autoincrement()) 
+  nome     String    @db.VarChar(45)
+
+  reservas Reserva[] // Relação adicionada com Reserva
+}
+
+model HospedeDaReserva {
+  id                 Int       @id @default(autoincrement()) 
+  nomeCompleto       String    @db.VarChar(45)              
+  criadoPor          String    @db.VarChar(45)
+  criadoEm           DateTime
+  atualizadoPor      String    @db.VarChar(45)
+  atualizadoEm       DateTime
+  reservaLocalizador String    @db.VarChar(10)
+
+  reservas           Reserva[] // Relação adicionada com Reserva
+}
+
+model TaxaDaReserva {
+  id                  Int       @id @default(autoincrement()) 
+  taxa                String    @db.VarChar(45)              
+  criado_por          String    @db.VarChar(45)
+  criado_em           DateTime
+  atualizado_por      String    @db.VarChar(45)
+  atualizado_em       DateTime
+  valor               Decimal   @db.Decimal(10,2)            
+
+  // Chave estrangeira para Reserva
+  reservaId           Int
+
+  reserva             Reserva   @relation(fields: [reservaId], references: [id])
+}
+
+model Reserva {
+  id                        Int                @id @default(autoincrement())
+  localizador               String             @db.VarChar(10)
+  idAutomacao               Int
+  criadoPor                 String             @db.VarChar(45)
+  atualizadoPor             String             @db.VarChar(45)
+  criadoEm                  DateTime
+  atualizadoEm              DateTime
+  idExterno                 String             @db.VarChar(36)
+  dataDaCriacao             DateTime
+  checkIn                   DateTime
+  checkOut                  DateTime
+  periodoDaReservaInicio    DateTime
+  periodoDaReservaFim       DateTime
+  horaCheckIn               DateTime
+  horaCheckOut              DateTime
+  quantidadeHospedes        Int
+  quantidadeAdultos         Int
+  quantidadeCriancas        Int
+  quantidadeInfantil        Int
+  observacoes               String             @db.VarChar(255)
+  quantidadeDiarias         Int
+  partnerCode               String             @db.VarChar(45)
+  moeda                     String             @db.Char(3)
+  valorTotal                Decimal            @db.Decimal(10,2)
+  totalTaxasExtras          Decimal            @db.Decimal(10,2)
+  totalPago                 Decimal            @db.Decimal(10,2)
+  pendenteQuitacao          Decimal            @db.Decimal(10,2)
+  status                    String
+  chatReserva               String             @db.VarChar(255)
+  processamentoPg           String
+  responsavel               String             @db.VarChar(90)
+  linkStays                 String             @db.VarChar(2083)
+  origem                    String             @db.VarChar(45)
+  nomeDoImovelPersonalizado String             @db.VarChar(45)
+  condominio                String             @db.VarChar(45)
+  regiao                    String             @db.VarChar(45)
+  idImovelStays             String             @db.VarChar(45)
+  imovelOficialSku          String             @db.VarChar(45)
+  canaisTitulo              String             @db.VarChar(45)
+
+  // Chaves estrangeiras
+  imovelId                  Int
+  canalId                   Int
+  hospedeDaReservaId        Int
+  agenteId                  Int
+
+  // Relacionamentos
+  imovel                    Imovel           @relation(fields: [imovelId], references: [id])
+  canal                     Canal            @relation(fields: [canalId], references: [id])
+  hospedeDaReserva          HospedeDaReserva @relation(fields: [hospedeDaReservaId], references: [id])
+  agente                    Agente           @relation(fields: [agenteId], references: [id])
+
+  // Relação inversa com TaxaDaReserva
+  taxasDaReserva            TaxaDaReserva[]
+}
