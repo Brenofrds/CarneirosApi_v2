@@ -16,6 +16,6 @@ export async function enviarProprietariosParaJestor() {
             console.log(`Proprietário enviado: ${response.data}`);
         }
     } catch (error: any) {
-        console.error('Erro ao enviar proprietários para o Jestor:', error.response?.data || error.message);
+        console.error('Erro ao envsasiar proprietários para o Jestor:', error.response?.data || error.message);
     }
 }
