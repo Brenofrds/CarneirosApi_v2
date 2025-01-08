@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_TOKEN = 'MmQ4MTk1ZmY5ZGUzYzEzce1c7be307MTY4MDAyNzE0M2UyYzk1'; // Substitua pelo seu token correto
+const API_TOKEN = 'YzIwMTJhODljOGUyNjc41064b2d938MTcwNjc0MjU5NWU1YmE3'; // Substitua pelo seu token correto
 const BASE_URL = 'https://carneirostemporada.api.jestor.com'; // Certifique-se de que este é o domínio correto
 
 const jestorClient = axios.create({

@@ -17,6 +17,25 @@ export async function fetchTelefones(page: number = 1, size: number = 10): Promi
   }
 }
 
+//Cria um registro novo na tabela do Jestor
+export async function jestorCreateRecord(data: any) {
+  try{
+    const response = await jestorClient.post('/object/create', {
+        object_type: 'yhe66m7287os9_0xq_kbu',//tabela testEngNet_1
+        data: {
+          cpf_1: data.cpf_cnpj,
+          nome: data.proprietario_principal,
+          email: data.email
+        },
+      });
+  }
+  catch(error: any){
+    console.error('Erro ao criar registro no Jestor', error.response?.data || error.message);
+    throw new Error('Falha ao criar registro');
+  }
+}
+
+/*
 async function main() {
     
     const telefones = await fetchTelefones(1, 10); // Busca telefones na página 1 com 10 registros
@@ -24,3 +43,4 @@ async function main() {
 }
   
 main();
+*/
