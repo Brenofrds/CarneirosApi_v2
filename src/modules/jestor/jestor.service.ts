@@ -1,26 +1,21 @@
 import jestorClient from '../../config/jestorClient';
+import prisma from '../../config/database';
 
-export async function fetchTelefones(page: number = 1, size: number = 10): Promise<string[]> {
-  try {
-    const response = await jestorClient.post('/object/list', {
-      object_type: 'a3672133a5950a31442d1', // ID ou nome da tabela
-      page,
-      size,
-      select: ['telefone'], // Campo desejado
-    });
+export async function enviarProprietariosParaJestor() {
+    try {
+        // Busca os proprietários do banco de dados
+        const proprietarios = await prisma.proprietario.findMany();
 
-    const telefones = response.data.data.items.map((item: any) => item.telefone); // Extrai apenas os telefones
-    return telefones;
-  } catch (error: any) {
-    console.error('Erro ao buscar telefones:', error.response?.data || error.message);
-    throw new Error('Falha ao buscar telefones');
-  }
+        for (const proprietario of proprietarios) {
+            // Envia cada proprietário para a API do Jestor
+            const response = await jestorClient.post('/object/<id-da-sua-tabela>', {
+                nome: proprietario.proprietario_principal,
+                cpf_cnpj: proprietario.cpf_cnpj,
+                email: proprietario.email,
+            });
+            console.log(`Proprietário enviado: ${response.data}`);
+        }
+    } catch (error: any) {
+        console.error('Erro ao enviar proprietários para o Jestor:', error.response?.data || error.message);
+    }
 }
-
-async function main() {
-    
-    const telefones = await fetchTelefones(1, 10); // Busca telefones na página 1 com 10 registros
-    console.log('Telefones encontrados:', telefones);
-}
-  
-main();

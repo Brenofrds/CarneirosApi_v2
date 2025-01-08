@@ -140,7 +140,7 @@ export async function fetchImovel(listingId: string): Promise<void> {
 }
 
 // Chama a função de reservas
-fetchReservas('2024-03-01', '2024-03-31', 0, 5)
+fetchReservas('2024-03-01', '2024-03-31', 0, 2)
   .then(() => {
     console.log('Processamento concluído.');
   })
