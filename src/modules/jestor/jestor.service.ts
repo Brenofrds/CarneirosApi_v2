@@ -1,3 +1,4 @@
+import { response } from 'express';
 import jestorClient from '../../config/jestorClient';
 
 export async function fetchTelefones(page: number = 1, size: number = 10): Promise<string[]> {
@@ -35,6 +36,24 @@ export async function jestorCreateRecord(data: any) {
   }
 }
 
+//Consulta um registro pelo CPF na tabela do Jestor
+export async function jestorFetchRecord(data: any) {
+  try{
+    const response = await jestorClient.post('/object/list', {
+        object_type: 'yhe66m7287os9_0xq_kbu',//tabela testEngNet_1
+        sort: '',
+        page: 1,
+        size: '10',
+        select: ['proprietario_principal'],  //seleciona os campos tabela que quero mostrar
+        filters: [{cpf_1: data.cpf_cnpj, operator: '=='}] //especifica o campo e o tipo de operação para o filtro
+      });
+      console.log("O proprietario existe! Nome: " + response.data.items.name);
+  }
+  catch(error: any){
+    console.error('Erro ao criar registro no Jestor', error.response?.data || error.message);
+    throw new Error('Falha ao criar registro');
+  }
+}
 /*
 async function main() {
     

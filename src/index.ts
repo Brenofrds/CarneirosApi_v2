@@ -1,7 +1,8 @@
 import express from 'express';
-import { jestorCreateRecord } from './modules/jestor/jestor.service';
+//import { jestorCreateRecord } from './modules/jestor/jestor.service';
+import { jestorFetchRecord } from './modules/jestor/jestor.service';
 import prisma from './config/database';
-import './middleware';//importa e executa o middleware
+//import './middleware';//importa e executa o middleware
 
 const app = express();
 app.use(express.json());
@@ -27,7 +28,7 @@ app.get('/jestorDB', async (req, res)=>{
 /*--------------------------------------------------
 ROTA: consulta apenas um registro da tabela proprie-
 tarios
-*/
+
 app.get('/jestorDB', async(req, res)=>{
     const a = await prisma.proprietario.findUnique({
         where: {
@@ -40,15 +41,34 @@ app.get('/jestorDB', async(req, res)=>{
     Portman ou PrismaStudio) não recebe os dados que fo-
     ram retornados na variavel a. Ou seja, não vai dar 
     pra ver a comunicação acontecendo.
-     */
+     *
     res.status(200).json(a);
     console.log(a);
 
     if(a){
-        await jestorCreateRecord(a);
+        //await jestorCreateRecord(a);
+        await jestorFetchRecord(a);
     }
 });
+*/
 
+/*--------------------------------------------------
+ROTA: consulta um registro da tabela no jestor pelo
+CPF informado
+*/
+app.get('/jestorDB', async(req, res)=>{
+    const a = await prisma.proprietario.findUnique({
+        where: {
+            cpf_cnpj: '222222222-11',
+        },
+    })
+    res.status(200).json(a);
+    console.log(a);
+
+    if(a){
+        await jestorFetchRecord(a);
+    }
+});
 
 /*--------------------------------------------------
 Para 'escutar' o servidor do banco de dados
@@ -56,3 +76,4 @@ Para 'escutar' o servidor do banco de dados
 app.listen(3000, ()=>{
     console.log("Servidor do jestorDB rodando...");
 })
+
