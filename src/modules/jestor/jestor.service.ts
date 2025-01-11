@@ -1,21 +1,16 @@
-import jestorClient from '../../config/jestorClient';
-import prisma from '../../config/database';
+import { sincronizarProprietarios } from './proprietarios/proprietarios.service';
+import { sincronizarAgentes } from './agentes/agentes.service';
 
-export async function enviarProprietariosParaJestor() {
+export async function sincronizarTudo() {
     try {
-        // Busca os proprietários do banco de dados
-        const proprietarios = await prisma.proprietario.findMany();
+        console.log('Iniciando sincronização de proprietários...');
+        await sincronizarProprietarios();
+        console.log('Sincronização de proprietários concluída!');
 
-        for (const proprietario of proprietarios) {
-            // Envia cada proprietário para a API do Jestor
-            const response = await jestorClient.post('/object/<id-da-sua-tabela>', {
-                nome: proprietario.proprietario_principal,
-                cpf_cnpj: proprietario.cpf_cnpj,
-                email: proprietario.email,
-            });
-            console.log(`Proprietário enviado: ${response.data}`);
-        }
+        console.log('Iniciando sincronização de agentes...');
+        await sincronizarAgentes();
+        console.log('Sincronização de agentes concluída!');
     } catch (error: any) {
-        console.error('Erro ao enviar proprietários para o Jestor:', error.response?.data || error.message);
+        console.error('Erro durante a sincronização geral:', error.message);
     }
 }
