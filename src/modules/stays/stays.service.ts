@@ -1,149 +1,231 @@
 import staysClient from '../../config/staysClient';
+import prisma from '../../config/database';
+import { ReservaData, HospedeDetalhado, AgenteDetalhado } from './stays.types'; // Ajuste o caminho de importação conforme necessário
 
-// Interface para os parâmetros de busca de reservas
-interface FetchDataReservasParams {
-  fromDate: string;
-  toDate: string;
-  skip: number;
-  limit: number;
+/**
+ * Busca os detalhes de um hóspede na API Stays.
+ * @param clientId - ID do cliente/hóspede.
+ * @returns Dados detalhados do hóspede ou null se não encontrado.
+ */
+export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDetalhado | null> {
+  try {
+    const endpoint = `/booking/clients/${clientId}`;
+    const response = await staysClient.get(endpoint);
+    return response.data;
+  } catch (error: any) {
+    console.error(`Erro ao buscar detalhes do hóspede ${clientId}:`, error.response?.data || error.message);
+    return null;
+  }
 }
 
-export interface Reserva {
-  localizador: string;
-  dataCriacao: string;
-  checkIn: string;
-  checkOut: string;
-  quantHospedes: number;
-  adultos: number;
-  criancas: number;
-  infantil: number;
-  moeda: string;
-  valorTotal: number;
-  totalPago: number;
-  pendenteQuitacao: number;
-  diarias: number;
-  codigoParceiro: string;
-  linkReserva: string;
-  idImovel: string;
-  idAgente: string;
-  idCanal: string;
-}
-
-export interface Agente {
-  id: string;
-  name: string;
-}
-
-export interface Canal {
-  id: string;
-  titulo: string;
-}
-
-// Função para buscar reservas
-export async function fetchReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
+/**
+ * Busca reservas na API Stays e retorna os dados transformados.
+ * @param fromDate - Data de início no formato YYYY-MM-DD.
+ * @param toDate - Data de fim no formato YYYY-MM-DD.
+ * @param skip - Número de registros a pular (paginação).
+ * @param limit - Limite de registros a buscar.
+ * @returns Uma lista de objetos contendo os dados das reservas e seus hóspedes.
+ */
+export async function fetchReservas(
+  fromDate: string,
+  toDate: string,
+  skip: number,
+  limit: number
+): Promise<{ reserva: ReservaData; hospede: HospedeDetalhado | null; agente: AgenteDetalhado | null }[]> {
   try {
     const endpoint = `/booking/reservations?from=${fromDate}&to=${toDate}&dateType=arrival&skip=${skip}&limit=${limit}`;
     const response = await staysClient.get(endpoint);
     const reservas = response.data;
 
-    const agentes: Map<string, Agente> = new Map();
-    const canais: Map<string, Canal> = new Map();
+    const resultados = [];
 
-    console.log('=== Dados das Reservas ===');
     for (const reserva of reservas) {
-      // Cálculo das diárias
-      const diarias =
-        (new Date(reserva.checkOutDate).getTime() - new Date(reserva.checkInDate).getTime()) / (1000 * 60 * 60 * 24);
-
-      // Cálculo do pendente a quitar
+      const diarias = (new Date(reserva.checkOutDate).getTime() - new Date(reserva.checkInDate).getTime()) / (1000 * 60 * 60 * 24);
       const pendenteQuitacao = reserva.price._f_total - (reserva.stats?._f_totalPaid || 0);
 
-      // Registro do agente
-      if (reserva.agent) {
-        const agenteId = reserva.agent._id;
-        const agenteName = reserva.agent.name;
-        if (!agentes.has(agenteId)) {
-          agentes.set(agenteId, { id: agenteId, name: agenteName });
-        }
+      const agenteDetalhado: AgenteDetalhado | null = reserva.agent
+        ? {
+            _id: reserva.agent._id,
+            name: reserva.agent.name,
+          }
+        : null;
+
+      const reservaData: ReservaData = {
+        localizador: reserva.id,
+        idExterno: reserva._id,
+        dataDaCriacao: reserva.creationDate.split('T')[0], // Extrai somente a data
+        checkIn: reserva.checkInDate.split('T')[0],       // Extrai somente a data
+        horaCheckIn: reserva.checkInTime,                 // Usa somente a hora
+        checkOut: reserva.checkOutDate.split('T')[0],     // Extrai somente a data
+        horaCheckOut: reserva.checkOutTime, 
+        quantidadeHospedes: reserva.guests,
+        quantidadeAdultos: reserva.guestsDetails.adults,
+        quantidadeCriancas: reserva.guestsDetails.children,
+        quantidadeInfantil: reserva.guestsDetails.infants,
+        moeda: reserva.price.currency,
+        valorTotal: reserva.price._f_total,
+        totalPago: reserva.stats._f_totalPaid,
+        pendenteQuitacao: pendenteQuitacao,
+        totalTaxasExtras: reserva.price.extrasDetails._f_total || 0,
+        quantidadeDiarias: diarias,
+        partnerCode: reserva.partnerCode || null,
+        linkStays: reserva.reservationUrl,
+        idImovelStays: reserva._idlisting,
+        canaisTitulo: reserva.partner?.name || '',
+        agenteId: reserva.agent?._id || null,
+        origem: reserva.partner?.name || '',
+        status: reserva.type,
+        condominio: '', // Não disponível diretamente
+        regiao: '', // Não disponível diretamente
+        imovelOficialSku: '', // Não disponível diretamente
+      };
+
+      // Buscar detalhes do hóspede relacionado à reserva
+      let hospedeDetalhado: HospedeDetalhado | null = null;
+      if (reserva._idclient) {
+        hospedeDetalhado = await fetchHospedeDetalhado(reserva._idclient);
       }
 
-      // Registro do canal
-      if (reserva.partner) {
-        const canalId = reserva.partner._id;
-        const canalTitulo = reserva.partner.name;
-        if (!canais.has(canalId)) {
-          canais.set(canalId, { id: canalId, titulo: canalTitulo });
-        }
+      resultados.push({ reserva: reservaData, hospede: hospedeDetalhado, agente: agenteDetalhado });
+    }
+
+    return resultados;
+  } catch (error: any) {
+    console.error('Erro ao buscar reservas:', error.response?.data || error.message);
+    return [];
+  }
+}
+
+/**
+ * Salva reservas e seus hóspedes relacionados no banco de dados.
+ * 
+ * @param dados - Lista de objetos contendo dados da reserva e do hóspede relacionado.
+ */
+/**
+ * Salva reservas, seus hóspedes relacionados e agentes no banco de dados.
+ * 
+ * @param dados - Lista de objetos contendo dados da reserva, do hóspede relacionado e do agente.
+ */
+export async function salvarReservasNoBanco(dados: { reserva: ReservaData; hospede: HospedeDetalhado | null; agente: AgenteDetalhado | null }[]): Promise<void> {
+  try {
+    for (const { reserva, hospede, agente } of dados) {
+      // Inserir ou atualizar o agente, se disponível
+      if (agente) {
+        await prisma.agente.upsert({
+          where: { idExterno: agente._id },
+          update: { nome: agente.name },
+          create: {
+            idExterno: agente._id,
+            nome: agente.name,
+            sincronizadoNoJestor: false,
+          },
+        });
       }
 
-      // Exibição dos dados da reserva
-      console.log('===============================');
-      console.log(`Localizador: ${reserva.id}`);
-      console.log(`Data de Criação: ${reserva.creationDate}`);
-      console.log(`Check-in: ${reserva.checkInDate} às ${reserva.checkInTime}`);
-      console.log(`Check-out: ${reserva.checkOutDate} às ${reserva.checkOutTime}`);
-      console.log(`Quantidade de Hóspedes: ${reserva.guests}`);
-      console.log(`Adultos: ${reserva.guestsDetails.adults}`);
-      console.log(`Crianças: ${reserva.guestsDetails.children}`);
-      console.log(`Infantil: ${reserva.guestsDetails.infants}`);
-      console.log(`Moeda: ${reserva.price.currency}`);
-      console.log(`Valor Total: ${reserva.price._f_total}`);
-      console.log(`Total Pago: ${reserva.stats._f_totalPaid}`);
-      console.log(`Pendente Quitação: ${pendenteQuitacao}`);
-      console.log(`Diárias: ${diarias}`);
-      console.log(`Código do Parceiro: ${reserva.partnerCode}`);
-      console.log(`Link da Reserva: ${reserva.reservationUrl}`);
-      console.log(`Imóvel ID: ${reserva._idlisting}`);
-      console.log(`Agente ID: ${reserva.agent?._id || 'N/A'}`);
-      console.log(`Canal ID: ${reserva.partner?._id || 'N/A'}`);
-      console.log('===============================');
+      // Inserir ou atualizar a reserva
+      const reservaSalva = await prisma.reserva.upsert({
+        where: { localizador: reserva.localizador },
+        update: {
+          idExterno: reserva.idExterno,
+          dataDaCriacao: reserva.dataDaCriacao,
+          checkIn: reserva.checkIn,
+          horaCheckIn: reserva.horaCheckIn,
+          checkOut: reserva.checkOut,
+          horaCheckOut: reserva.horaCheckOut,
+          quantidadeHospedes: reserva.quantidadeHospedes,
+          quantidadeAdultos: reserva.quantidadeAdultos,
+          quantidadeCriancas: reserva.quantidadeCriancas,
+          quantidadeInfantil: reserva.quantidadeInfantil,
+          moeda: reserva.moeda,
+          valorTotal: reserva.valorTotal,
+          totalPago: reserva.totalPago,
+          pendenteQuitacao: reserva.pendenteQuitacao,
+          totalTaxasExtras: reserva.totalTaxasExtras,
+          quantidadeDiarias: reserva.quantidadeDiarias,
+          partnerCode: reserva.partnerCode,
+          linkStays: reserva.linkStays,
+          idImovelStays: reserva.idImovelStays,
+          canaisTitulo: reserva.canaisTitulo,
+          agenteId: agente ? agente._id : null, // Relacionar com o ID do agente
+          origem: reserva.origem,
+          status: reserva.status,
+          condominio: reserva.condominio,
+          regiao: reserva.regiao,
+          imovelOficialSku: reserva.imovelOficialSku,
+        },
+        create: {
+          localizador: reserva.localizador,
+          idExterno: reserva.idExterno,
+          dataDaCriacao: reserva.dataDaCriacao,
+          checkIn: reserva.checkIn,
+          horaCheckIn: reserva.horaCheckIn,
+          checkOut: reserva.checkOut,
+          horaCheckOut: reserva.horaCheckOut,
+          quantidadeHospedes: reserva.quantidadeHospedes,
+          quantidadeAdultos: reserva.quantidadeAdultos,
+          quantidadeCriancas: reserva.quantidadeCriancas,
+          quantidadeInfantil: reserva.quantidadeInfantil,
+          moeda: reserva.moeda,
+          valorTotal: reserva.valorTotal,
+          totalPago: reserva.totalPago,
+          pendenteQuitacao: reserva.pendenteQuitacao,
+          totalTaxasExtras: reserva.totalTaxasExtras,
+          quantidadeDiarias: reserva.quantidadeDiarias,
+          partnerCode: reserva.partnerCode,
+          linkStays: reserva.linkStays,
+          idImovelStays: reserva.idImovelStays,
+          canaisTitulo: reserva.canaisTitulo,
+          agenteId: agente ? agente._id : null, // Relacionar com o ID do agente
+          origem: reserva.origem,
+          status: reserva.status,
+          condominio: reserva.condominio,
+          regiao: reserva.regiao,
+          imovelOficialSku: reserva.imovelOficialSku,
+        },
+      });
 
-      // Chama a função de imóveis para buscar os dados do imóvel relacionado
-      if (reserva._idlisting) {
-        await fetchImovel(reserva._idlisting);
+      // Inserir ou atualizar o hóspede, se disponível
+      if (hospede) {
+        const telefone = hospede.phones?.[0]?.iso || null;
+        const cpf = hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || null;
+        const documento = hospede.documents?.find((doc) => doc.type === 'id')?.numb || null;
+
+        await prisma.hospede.upsert({
+          where: { idExterno: hospede._id },
+          update: {
+            nomeCompleto: hospede.name,
+            email: hospede.email,
+            dataDeNascimento: hospede.birthDate || null, // Salvar diretamente como string
+            nacionalidade: hospede.nationality || null,
+            fonte: hospede.clientSource,
+            telefone,
+            cpf,
+            documento,
+            reservaId: reservaSalva.id, // Relacionar com a reserva salva
+          },
+          create: {
+            idExterno: hospede._id,
+            nomeCompleto: hospede.name,
+            email: hospede.email,
+            dataDeNascimento: hospede.birthDate || null, // Salvar diretamente como string
+            nacionalidade: hospede.nationality || null,
+            fonte: hospede.clientSource,
+            telefone,
+            cpf,
+            documento,
+            reservaId: reservaSalva.id, // Relacionar com a reserva salva
+          },
+        });
       }
     }
 
-    // Exibição dos dados dos agentes
-    console.log('=== Tabela de Agentes ===');
-    agentes.forEach((agente) => {
-      console.log(`ID do Agente: ${agente.id}, Nome: ${agente.name}`);
-    });
-
-    // Exibição dos dados dos canais
-    console.log('=== Tabela de Canais ===');
-    canais.forEach((canal) => {
-      console.log(`ID do Canal: ${canal.id}, Título: ${canal.titulo}`);
-    });
+    console.log('Dados salvos no banco de dados com sucesso.');
   } catch (error: any) {
-    console.error('Erro ao buscar reservas:', error.response?.data || error.message);
+    console.error('Erro ao salvar dados no banco de dados:', error.message);
   }
 }
 
-// Função para buscar dados de um imóvel específico
-export async function fetchImovel(listingId: string): Promise<void> {
-  try {
-    const endpoint = `/content/listings/${listingId}`;
-    const response = await staysClient.get(endpoint);
-    const imovel = response.data;
-
-    console.log('=== Dados do Imóvel ===');
-    console.log('===============================');
-    console.log(`SKU: ${imovel.id}`);
-    console.log(`ID Stays: ${imovel._id}`);
-    console.log(`Proprietário ID: ${imovel._idproperty}`);
-    console.log(`Condomínio: ${imovel.address.additional || 'N/A'}`);
-    console.log('===============================');
-  } catch (error: any) {
-    console.error('Erro ao buscar dados do imóvel:', error.response?.data || error.message);
-  }
-}
-
-// Chama a função de reservas
-fetchReservas('2024-03-01', '2024-03-31', 0, 2)
-  .then(() => {
-    console.log('Processamento concluído.');
-  })
-  .catch((error) => {
-    console.error('Erro no processamento:', error.message);
-  });
+(async () => {
+  const reservas = await fetchReservas('2024-02-01', '2024-02-29', 0, 5);
+  await salvarReservasNoBanco(reservas);
+})();
