@@ -1,3 +1,57 @@
+/*--------------------------------------------------
+Lógica do negócio.
+Funções que interagem diretamente com o banco de da-
+dos e outras funcionalidades, como a integração com 
+o Jestor.
+
+Conteúdo: Funções como listTables, listColumns, 
+sendDataToJestor, etc.
+*/
+
+//codigo exemplo
+import { PrismaClient } from '@prisma/client';
+import axios from 'axios';
+
+const prisma = new PrismaClient();
+
+//lista as tabelas do banco de dados
+export async function listTables() {
+  const tables = await prisma.$queryRaw<{ table_name: string }[]>`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'public'`;
+  return tables.map((table) => table.table_name);
+}
+
+//lista as colunas da tabela
+export async function listColumns(tableName: string) {
+  const columns = await prisma.$queryRaw<{ column_name: string }[]>`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = ${tableName} AND table_schema = 'public'`;
+  return columns.map((column) => column.column_name);
+}
+
+//envia os dados para o jestor
+export async function sendDataToJestor(tableName: string) {
+  const records = await prisma[tableName].findMany();
+
+  for (const record of records) {
+    try {
+      await axios.post('https://api.jestor.com.br/v1/endpoint', record, {
+        headers: {
+          'Authorization': `Bearer SEU_TOKEN_AQUI`,
+        },
+      });
+      console.log(`Registro enviado para a tabela ${tableName}:`, record);
+    } catch (error) {
+      console.error(`Erro ao enviar o registro para o Jestor:`, error);
+    }
+  }
+}
+
+//********************************************************************************
+//********************************************************************************
 import { response } from 'express';
 import jestorClient from '../../config/jestorClient';
 

@@ -1,3 +1,7 @@
+/*--------------------------------------------------
+Configuração da conexão base com o Jestor
+Importação do axios
+*/
 import axios from 'axios';
 
 const API_TOKEN = 'YzIwMTJhODljOGUyNjc41064b2d938MTcwNjc0MjU5NWU1YmE3'; // Substitua pelo seu token correto
