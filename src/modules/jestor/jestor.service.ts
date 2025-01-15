@@ -8,11 +8,10 @@ Conteúdo: Funções como listTables, listColumns,
 sendDataToJestor, etc.
 */
 
-//codigo exemplo
-import { PrismaClient } from '@prisma/client';
-import axios from 'axios';
+//codigo alterado
+import jestorClient from '../../config/jestorClient';//importa o axios
+import prisma from 'config/database';//importa o prisma
 
-const prisma = new PrismaClient();
 
 //lista as tabelas do banco de dados
 export async function listTables() {
@@ -32,17 +31,13 @@ export async function listColumns(tableName: string) {
   return columns.map((column) => column.column_name);
 }
 
-//envia os dados para o jestor
+//envia todos os dados de uma tabela para o jestor
 export async function sendDataToJestor(tableName: string) {
   const records = await prisma[tableName].findMany();
 
   for (const record of records) {
     try {
-      await axios.post('https://api.jestor.com.br/v1/endpoint', record, {
-        headers: {
-          'Authorization': `Bearer SEU_TOKEN_AQUI`,
-        },
-      });
+      await jestorClient.post('/object/create', record);
       console.log(`Registro enviado para a tabela ${tableName}:`, record);
     } catch (error) {
       console.error(`Erro ao enviar o registro para o Jestor:`, error);

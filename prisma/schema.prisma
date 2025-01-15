@@ -16,6 +16,7 @@ model Proprietario {
   proprietario_principal String
   email               String
   imoveis             Imovel[]
+  sincronizadoNoJestor Boolean @default(false) //Indica sincronizacao com o Jestor
 }
 
 model Condominio {
