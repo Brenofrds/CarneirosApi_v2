@@ -5,7 +5,7 @@ INTERFACE
 2.Tabelas: campos
 */
 
-//Interface para os parametros de busca de reservas
+// Interface para os parametros de busca de reservas
 export interface FetchDataReservasParams {
     fromDate: string;
     toDate: string;
@@ -13,34 +13,71 @@ export interface FetchDataReservasParams {
     limit: number;
 }
 
-//Tabela: Reserva
-export interface Reserva {
+// Tipo para os detalhes do hóspede obtidos na API Stays
+export interface HospedeDetalhado {
+    _id: string;
+    kind: string;
+    fName: string;
+    lName: string;
+    name: string;
+    email: string;
+    isUser: boolean;
+    creationDate: string;
+    birthDate?: string;
+    nationality?: string;
+    clientSource: string;
+    contactEmails: { adr: string }[];
+    phones?: { iso: string; hint?: string }[];
+    documents?: { type: string; numb: string; issued?: string }[];
+}
+  
+// Tabela: Reserva. Tipo para os dados transformados de reserva
+export interface ReservaData {
+    //--------------------------------------------------
+    idReserva: string;
     localizador: string;
-    dataCriacao: string;
-    checkIn: string;
-    checkOut: string;
-    quantHospedes: number;
-    adultos: number;
-    criancas: number;
-    infantil: number;
+    dataDaCriacao: string; // Somente data no formato YYYY-MM-DD
+    checkInData: string;   // Somente data no formato YYYY-MM-DD
+    CheckInHora: string;   // Somente hora no formato HH:mm
+    checkOutData: string;  // Somente data no formato YYYY-MM-DD
+    CheckOutHora: string;  // Somente hora no formato HH:mm
+    //--------------------------------------------------
+    idImovelStays: string;
+    //--------------------------------------------------
+    idHospede: string;
+    //--------------------------------------------------
+    status: string;
+    //--------------------------------------------------
+    agenteId: string | null;
+    agenteNome: string | null;
+    //--------------------------------------------------
     moeda: string;
     valorTotal: number;
     totalPago: number;
+    //--------------------------------------------------
+    quantidadeHospedes: number;
+    quantidadeAdultos: number;
+    quantidadeCriancas: number;
+    quantidadeInfantil: number;
+    //--------------------------------------------------
+    partnerCode: string;
+    linkStays: string;
+    canaisTitulo: string;
+    origem: string;
+
+    //calculados----------------------------------------
     pendenteQuitacao: number;
-    diarias: number;
-    codigoParceiro: string;
-    linkReserva: string;
-    idImovel: string;
-    idAgente: string;
-    idCanal: string;
+    totalTaxasExtras: number;
+    quantidadeDiarias: number;
+
+    //deOutraTabela-------------------------------------
+    condominio: string;
+    regiao: string;
+    imovelOficialSku: string;
 }
-  
-export interface Agente {
-    id: string;
-    name: string;
-}
-  
-export interface Canal {
-    id: string;
-    titulo: string;
+
+// Tipo para os detalhes do agente obtidos na API Stays
+export interface AgenteDetalhado {
+  _id: string;  // ID do agente na Stays
+  name: string; // Nome do agente
 }
