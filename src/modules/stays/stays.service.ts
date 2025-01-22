@@ -1,3 +1,30 @@
+import { fetchReservas, fetchHospedeDetalhado } from './services/fetchService';
+import { transformReserva, transformAgente } from './services/transformService';
+import { salvarReserva, salvarHospede } from './services/saveService';
+
+export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
+  const reservas = await fetchReservas(fromDate, toDate, skip, limit);
+
+  for (const reserva of reservas) {
+    const reservaData = transformReserva(reserva);
+    const agenteDetalhado = transformAgente(reserva.agent);
+    const hospedeDetalhado = reserva._idclient ? await fetchHospedeDetalhado(reserva._idclient) : null;
+
+    const reservaSalva = await salvarReserva(reservaData, agenteDetalhado);
+    if (hospedeDetalhado) {
+      await salvarHospede(hospedeDetalhado, reservaSalva.id);
+    }
+  }
+
+  console.log('Processamento de reservas concluído.');
+}
+
+(async () => {
+  await processarReservas('2024-02-01', '2024-02-28', 0, 11);
+})();
+
+
+/**
 import staysClient from '../../config/staysClient';
 import prisma from '../../config/database';
 import { ReservaData, HospedeDetalhado, AgenteDetalhado } from './stays.types'; // Ajuste o caminho de importação conforme necessário
@@ -6,7 +33,7 @@ import { ReservaData, HospedeDetalhado, AgenteDetalhado } from './stays.types'; 
  * Busca os detalhes de um hóspede na API Stays.
  * @param clientId - ID do cliente/hóspede.
  * @returns Dados detalhados do hóspede ou null se não encontrado.
- */
+
 export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDetalhado | null> {
   try {
     const endpoint = `/booking/clients/${clientId}`;
@@ -18,14 +45,14 @@ export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDe
   }
 }
 
-/**
+
  * Busca reservas na API Stays e retorna os dados transformados.
  * @param fromDate - Data de início no formato YYYY-MM-DD.
  * @param toDate - Data de fim no formato YYYY-MM-DD.
  * @param skip - Número de registros a pular (paginação).
  * @param limit - Limite de registros a buscar.
  * @returns Uma lista de objetos contendo os dados das reservas e seus hóspedes.
- */
+
 export async function fetchReservas(
   fromDate: string,
   toDate: string,
@@ -96,7 +123,7 @@ export async function fetchReservas(
   }
 }
 
-/**
+
  * Salva reservas e seus hóspedes relacionados no banco de dados.
  * 
  * @param dados - Lista de objetos contendo dados da reserva e do hóspede relacionado.
@@ -105,7 +132,7 @@ export async function fetchReservas(
  * Salva reservas, seus hóspedes relacionados e agentes no banco de dados.
  * 
  * @param dados - Lista de objetos contendo dados da reserva, do hóspede relacionado e do agente.
- */
+
 export async function salvarReservasNoBanco(dados: { reserva: ReservaData; hospede: HospedeDetalhado | null; agente: AgenteDetalhado | null }[]): Promise<void> {
   try {
     for (const { reserva, hospede, agente } of dados) {
@@ -228,4 +255,6 @@ export async function salvarReservasNoBanco(dados: { reserva: ReservaData; hospe
 (async () => {
   const reservas = await fetchReservas('2024-02-01', '2024-02-29', 0, 5);
   await salvarReservasNoBanco(reservas);
-})();
+})()
+
+*/

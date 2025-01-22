@@ -1,5 +1,5 @@
-import prisma from '../../config/database';
-import { ReservaData, HospedeDetalhado, AgenteDetalhado } from './stays.types';
+import prisma from '../../../config/database';
+import { ReservaData, HospedeDetalhado, AgenteDetalhado } from '../stays.types';
 
 export async function salvarReserva(reserva: ReservaData, agente: AgenteDetalhado | null) {
   if (agente) {
@@ -14,7 +14,7 @@ export async function salvarReserva(reserva: ReservaData, agente: AgenteDetalhad
     });
   }
 
-  await prisma.reserva.upsert({
+  return await prisma.reserva.upsert({
     where: { localizador: reserva.localizador },
     update: reserva,
     create: reserva,
@@ -34,6 +34,7 @@ export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId:
         email: hospede.email,
         dataDeNascimento: hospede.birthDate || null,
         nacionalidade: hospede.nationality || null,
+        fonte: hospede.clientSource,
         telefone,
         cpf,
         documento,
@@ -45,6 +46,7 @@ export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId:
         email: hospede.email,
         dataDeNascimento: hospede.birthDate || null,
         nacionalidade: hospede.nationality || null,
+        fonte: hospede.clientSource,
         telefone,
         cpf,
         documento,
@@ -53,4 +55,3 @@ export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId:
     });
   }
 }
-
