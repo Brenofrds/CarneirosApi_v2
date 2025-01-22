@@ -1,21 +1,21 @@
 // Tipo para os detalhes do hóspede obtidos na API Stays
 export interface HospedeDetalhado {
-    _id: string;
-    kind: string;
-    fName: string;
-    lName: string;
-    name: string;
-    email: string;
-    isUser: boolean;
-    creationDate: string;
-    birthDate?: string;
-    nationality?: string;
-    clientSource: string;
-    contactEmails: { adr: string }[];
-    phones?: { iso: string; hint?: string }[];
-    documents?: { type: string; numb: string; issued?: string }[];
+  _id: string;
+  kind: string;
+  fName: string;
+  lName: string;
+  name: string;
+  email: string;
+  isUser: boolean;
+  creationDate: string;
+  birthDate?: string;
+  nationality?: string;
+  clientSource: string;
+  contactEmails: { adr: string }[];
+  phones?: { iso: string; hint?: string }[];
+  documents?: { type: string; numb: string; issued?: string }[];
 }
-  
+
 // Tipo para os dados transformados de reserva
 export interface ReservaData {
   localizador: string;
@@ -37,7 +37,8 @@ export interface ReservaData {
   quantidadeDiarias: number;
   partnerCode: string;
   linkStays: string;
-  idImovelStays: string;
+  idImovelStays: string; // ID do imóvel na Stays
+  imovelId: number | null; // ID do imóvel relacionado no banco de dados
   canaisTitulo: string;
   agenteId: string | null;
   origem: string;
@@ -51,4 +52,12 @@ export interface ReservaData {
 export interface AgenteDetalhado {
   _id: string;  // ID do agente na Stays
   name: string; // Nome do agente
+}
+
+// Tipo para os detalhes do imóvel obtidos na API Stays
+export interface ImovelDetalhado {
+  _id: string;         // ID externo do imóvel na Stays
+  id: string;          // ID interno na Stays
+  internalName: string; // Nome interno ou SKU do imóvel
+  status: string;       // Status do imóvel (ex.: hidden, active)
 }

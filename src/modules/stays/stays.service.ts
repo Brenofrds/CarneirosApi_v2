@@ -1,15 +1,37 @@
-import { fetchReservas, fetchHospedeDetalhado } from './services/fetchService';
+import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado } from './services/fetchService';
 import { transformReserva, transformAgente } from './services/transformService';
-import { salvarReserva, salvarHospede } from './services/saveService';
+import { salvarReserva, salvarHospede, salvarImovel } from './services/saveService';
 
+/**
+ * Processa as reservas, incluindo agentes, hóspedes e imóveis.
+ * @param fromDate - Data inicial no formato YYYY-MM-DD.
+ * @param toDate - Data final no formato YYYY-MM-DD.
+ * @param skip - Quantidade de registros a ignorar para paginação.
+ * @param limit - Limite de registros a buscar.
+ */
 export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
   const reservas = await fetchReservas(fromDate, toDate, skip, limit);
 
   for (const reserva of reservas) {
+    // Transformar e salvar dados da reserva
     const reservaData = transformReserva(reserva);
     const agenteDetalhado = transformAgente(reserva.agent);
     const hospedeDetalhado = reserva._idclient ? await fetchHospedeDetalhado(reserva._idclient) : null;
 
+    // Buscar e salvar dados do imóvel relacionado à reserva
+    let imovelId: number | null = null;
+    if (reserva._idlisting) {
+      const imovelDetalhado = await fetchImovelDetalhado(reserva._idlisting);
+      if (imovelDetalhado) {
+        const imovelSalvo = await salvarImovel(imovelDetalhado);
+        imovelId = imovelSalvo.id; // Associar o ID do imóvel salvo à reserva
+      }
+    }
+
+    // Atualizar o campo imovelId na reserva
+    reservaData.imovelId = imovelId;
+
+    // Salvar a reserva, o agente e o hóspede
     const reservaSalva = await salvarReserva(reservaData, agenteDetalhado);
     if (hospedeDetalhado) {
       await salvarHospede(hospedeDetalhado, reservaSalva.id);
@@ -19,9 +41,11 @@ export async function processarReservas(fromDate: string, toDate: string, skip: 
   console.log('Processamento de reservas concluído.');
 }
 
+// Execução principal
 (async () => {
-  await processarReservas('2024-02-01', '2024-02-28', 0, 11);
+  await processarReservas('2024-02-01', '2024-02-28', 0, 20);
 })();
+
 
 
 /**

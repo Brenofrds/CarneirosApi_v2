@@ -31,7 +31,6 @@ model Hospede {
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
 }
 
-
 model Reserva {
   id                   Int       @id @default(autoincrement())
   localizador          String    @unique
@@ -62,6 +61,18 @@ model Reserva {
   regiao               String
   imovelOficialSku     String
   hospedes             Hospede[] // Relação com a tabela Hospede
+  imovelId             Int?      // Tornar opcional
+  imovel               Imovel?   @relation(fields: [imovelId], references: [id]) // Relação opcional com Imovel
   agente               Agente?   @relation(fields: [agenteId], references: [idExterno])
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
+}
+
+model Imovel {
+  id                   Int       @id @default(autoincrement())
+  idExterno            String    @unique // ID externo (_id) do imóvel na Stays
+  idStays              String    @unique // ID interno (id) do imóvel na Stays
+  sku                  String?   // Nome interno ou SKU do imóvel (internalName)
+  status               String    // Status do imóvel (ex.: hidden, active)
+  reservas             Reserva[] // Relação com a tabela Reserva (1 Imóvel -> N Reservas)
+  sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
 }

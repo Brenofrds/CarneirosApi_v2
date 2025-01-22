@@ -24,7 +24,8 @@ export function transformReserva(reserva: any): ReservaData {
     quantidadeDiarias: diarias,
     partnerCode: reserva.partnerCode || null,
     linkStays: reserva.reservationUrl,
-    idImovelStays: reserva._idlisting,
+    idImovelStays: reserva._idlisting, // ID do imóvel na Stays
+    imovelId: reserva._idlisting,      // Preenchendo o campo imovelId
     canaisTitulo: reserva.partner?.name || '',
     agenteId: reserva.agent?._id || null,
     origem: reserva.partner?.name || '',
