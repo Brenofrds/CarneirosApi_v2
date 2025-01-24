@@ -1,17 +1,10 @@
 // Tipo para os detalhes do hóspede obtidos na API Stays
 export interface HospedeDetalhado {
   _id: string;
-  kind: string;
-  fName: string;
-  lName: string;
   name: string;
   email: string;
   isUser: boolean;
-  creationDate: string;
   birthDate?: string;
-  nationality?: string;
-  clientSource: string;
-  contactEmails: { adr: string }[];
   phones?: { iso: string; hint?: string }[];
   documents?: { type: string; numb: string; issued?: string }[];
 }
@@ -60,4 +53,13 @@ export interface ImovelDetalhado {
   id: string;          // ID interno na Stays
   internalName: string; // Nome interno ou SKU do imóvel
   status: string;       // Status do imóvel (ex.: hidden, active)
+  _idproperty?: string; // ID externo do condomínio relacionado
+}
+
+// Tipo para os detalhes do condomínio obtidos na API Stays
+export interface CondominioDetalhado {
+  _id: string;         // ID externo do condomínio na Stays
+  id: string;          // ID interno na Stays
+  internalName: string; // Nome interno ou SKU do condomínio
+  regiao: string;       // Região do condomínio
 }

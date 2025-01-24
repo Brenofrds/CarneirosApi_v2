@@ -1,9 +1,9 @@
-import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado } from './services/fetchService';
+import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado, fetchCondominioDetalhado } from './services/fetchService';
 import { transformReserva, transformAgente } from './services/transformService';
-import { salvarReserva, salvarHospede, salvarImovel } from './services/saveService';
+import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio } from './services/saveService';
 
 /**
- * Processa as reservas, incluindo agentes, hóspedes e imóveis.
+ * Processa as reservas, incluindo agentes, hóspedes, imóveis e condomínios.
  * @param fromDate - Data inicial no formato YYYY-MM-DD.
  * @param toDate - Data final no formato YYYY-MM-DD.
  * @param skip - Quantidade de registros a ignorar para paginação.
@@ -25,6 +25,14 @@ export async function processarReservas(fromDate: string, toDate: string, skip: 
       if (imovelDetalhado) {
         const imovelSalvo = await salvarImovel(imovelDetalhado);
         imovelId = imovelSalvo.id; // Associar o ID do imóvel salvo à reserva
+
+        // Buscar e salvar o condomínio relacionado ao imóvel
+        if (imovelDetalhado._idproperty) {
+          const condominioDetalhado = await fetchCondominioDetalhado(imovelDetalhado._idproperty);
+          if (condominioDetalhado) {
+            await salvarCondominio(condominioDetalhado);
+          }
+        }
       }
     }
 
@@ -43,7 +51,7 @@ export async function processarReservas(fromDate: string, toDate: string, skip: 
 
 // Execução principal
 (async () => {
-  await processarReservas('2024-02-01', '2024-02-28', 0, 20);
+  await processarReservas('2024-02-01', '2024-02-28', 0, 30);
 })();
 
 

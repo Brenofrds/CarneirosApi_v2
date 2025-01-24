@@ -17,19 +17,18 @@ model Agente {
 
 model Hospede {
   id                   Int       @id @default(autoincrement())
-  idExterno            String    @unique
-  nomeCompleto         String
-  email                String?
-  dataDeNascimento     String?
-  nacionalidade        String?
-  fonte                String
-  telefone             String?   // Campo para armazenar o telefone
-  cpf                  String?   // Campo para armazenar o CPF
-  documento            String?   // Campo para armazenar o número do documento (ex.: RG)
-  reservaId            Int
-  reserva              Reserva   @relation(fields: [reservaId], references: [id]) // Relação com Reserva
+  idExterno            String    @unique // ID externo do hóspede
+  nomeCompleto         String    // Nome completo do hóspede
+  email                String?   // E-mail do hóspede
+  dataDeNascimento     String?   // Data de nascimento do hóspede
+  telefone             String?   // Telefone principal do hóspede
+  cpf                  String?   // CPF do hóspede
+  documento            String?   // Documento de identidade do hóspede
+  reservaId            Int       // Relacionamento com a tabela Reserva
+  reserva              Reserva   @relation(fields: [reservaId], references: [id])
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
 }
+
 
 model Reserva {
   id                   Int       @id @default(autoincrement())
@@ -73,6 +72,17 @@ model Imovel {
   idStays              String    @unique // ID interno (id) do imóvel na Stays
   sku                  String?   // Nome interno ou SKU do imóvel (internalName)
   status               String    // Status do imóvel (ex.: hidden, active)
+  idCondominioStays    String?   // ID externo do condomínio relacionado
   reservas             Reserva[] // Relação com a tabela Reserva (1 Imóvel -> N Reservas)
+  sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
+}
+
+
+model Condominio {
+  id                   Int       @id @default(autoincrement())
+  idExterno            String    @unique // ID externo (_id) do condomínio na Stays
+  idStays              String    @unique // ID interno (id) do condomínio na Stays
+  sku                  String    // Nome interno ou SKU do condomínio (internalName)
+  regiao               String    // Região do condomínio
   sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
 }
