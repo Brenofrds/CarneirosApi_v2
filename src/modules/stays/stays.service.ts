@@ -1,3 +1,68 @@
+import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado, fetchCondominioDetalhado } from './services/fetchService';
+import { transformReserva, transformAgente } from './services/transformService';
+import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio } from './services/saveService';
+
+/**
+ * Processa as reservas, incluindo agentes, hóspedes, imóveis e condomínios.
+ * @param fromDate - Data inicial no formato YYYY-MM-DD.
+ * @param toDate - Data final no formato YYYY-MM-DD.
+ * @param skip - Quantidade de registros a ignorar para paginação.
+ * @param limit - Limite de registros a buscar.
+ */
+export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
+  // Buscar apenas os IDs das reservas
+  const reservaIds = await fetchReservas(fromDate, toDate, skip, limit);
+
+  for (const reservaId of reservaIds) {
+    // Obter os detalhes completos da reserva
+    const reservaDetalhada = await fetchReservaDetalhada(reservaId);
+
+    if (!reservaDetalhada) {
+      console.warn(`Detalhes da reserva ${reservaId} não encontrados.`);
+      continue;
+    }
+
+    // Transformar e salvar os dados da reserva
+    const reservaData = transformReserva(reservaDetalhada);
+    const agenteDetalhado = transformAgente(reservaDetalhada.agent);
+    const hospedeDetalhado = reservaDetalhada._idclient ? await fetchHospedeDetalhado(reservaDetalhada._idclient) : null;
+
+    let imovelId: number | null = null;
+    if (reservaDetalhada._idlisting) {
+      const imovelDetalhado = await fetchImovelDetalhado(reservaDetalhada._idlisting);
+      if (imovelDetalhado) {
+        const imovelSalvo = await salvarImovel(imovelDetalhado);
+        imovelId = imovelSalvo.id;
+      }
+    }
+
+    reservaData.imovelId = imovelId;
+
+    // Salvar a reserva, o agente e o hóspede
+    const reservaSalva = await salvarReserva(reservaData, agenteDetalhado);
+    if (hospedeDetalhado) {
+      await salvarHospede(hospedeDetalhado, reservaSalva.id);
+    }
+    /*
+    // Salvar dados de taxas extras
+    if (reservaDetalhada.price.extrasDetails.fees.length > 0) {
+      await salvarTaxasExtras(reservaSalva.id, reservaDetalhada.price.extrasDetails.fees);
+    }
+    */
+  }
+
+  console.log('Processamento de reservas concluído.');
+}
+
+
+// Execução principal
+(async () => {
+  await processarReservas('2024-02-01', '2024-02-28', 0, 30);
+})();
+
+
+
+/**
 import staysClient from '../../config/staysClient';
 import prisma from '../../config/database';
 import { ReservaData, HospedeDetalhado, AgenteDetalhado } from './stays.types'; // Ajuste o caminho de importação conforme necessário
@@ -6,7 +71,7 @@ import { ReservaData, HospedeDetalhado, AgenteDetalhado } from './stays.types'; 
  * Busca os detalhes de um hóspede na API Stays.
  * @param clientId - ID do cliente/hóspede.
  * @returns Dados detalhados do hóspede ou null se não encontrado.
- */
+
 export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDetalhado | null> {
   try {
     const endpoint = `/booking/clients/${clientId}`;
@@ -18,14 +83,14 @@ export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDe
   }
 }
 
-/**
+
  * Busca reservas na API Stays e retorna os dados transformados.
  * @param fromDate - Data de início no formato YYYY-MM-DD.
  * @param toDate - Data de fim no formato YYYY-MM-DD.
  * @param skip - Número de registros a pular (paginação).
  * @param limit - Limite de registros a buscar.
  * @returns Uma lista de objetos contendo os dados das reservas e seus hóspedes.
- */
+
 export async function fetchReservas(
   fromDate: string,
   toDate: string,
@@ -96,7 +161,7 @@ export async function fetchReservas(
   }
 }
 
-/**
+
  * Salva reservas e seus hóspedes relacionados no banco de dados.
  * 
  * @param dados - Lista de objetos contendo dados da reserva e do hóspede relacionado.
@@ -105,7 +170,7 @@ export async function fetchReservas(
  * Salva reservas, seus hóspedes relacionados e agentes no banco de dados.
  * 
  * @param dados - Lista de objetos contendo dados da reserva, do hóspede relacionado e do agente.
- */
+
 export async function salvarReservasNoBanco(dados: { reserva: ReservaData; hospede: HospedeDetalhado | null; agente: AgenteDetalhado | null }[]): Promise<void> {
   try {
     for (const { reserva, hospede, agente } of dados) {
@@ -228,4 +293,6 @@ export async function salvarReservasNoBanco(dados: { reserva: ReservaData; hospe
 (async () => {
   const reservas = await fetchReservas('2024-02-01', '2024-02-29', 0, 5);
   await salvarReservasNoBanco(reservas);
-})();
+})()
+
+*/
