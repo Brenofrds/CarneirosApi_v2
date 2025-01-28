@@ -44,15 +44,27 @@ export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDe
 }
 
 
-// Função para buscar reservas com filtros de data e paginação
-export async function fetchReservas(fromDate: string, toDate: string, skip: number, limit: number) {
+export async function fetchReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<string[]> {
   try {
     const endpoint = `/booking/reservations?from=${fromDate}&to=${toDate}&dateType=arrival&skip=${skip}&limit=${limit}`;
     const response = await staysClient.get(endpoint);
-    return response.data;
+
+    // Retornar apenas os IDs das reservas
+    return response.data.map((reserva: { _id: string }) => reserva._id);
   } catch (error: any) {
     console.error('Erro ao buscar reservas:', error.response?.data || error.message);
     return [];
+  }
+}
+
+export async function fetchReservaDetalhada(reservationId: string): Promise<any> {
+  try {
+    const endpoint = `/booking/reservations/${reservationId}`;
+    const response = await staysClient.get(endpoint);
+    return response.data;
+  } catch (error: any) {
+    console.error(`Erro ao buscar detalhes da reserva ${reservationId}:`, error.response?.data || error.message);
+    return null;
   }
 }
 

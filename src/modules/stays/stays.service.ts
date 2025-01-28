@@ -10,33 +10,32 @@ import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio } from './
  * @param limit - Limite de registros a buscar.
  */
 export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
-  const reservas = await fetchReservas(fromDate, toDate, skip, limit);
+  // Buscar apenas os IDs das reservas
+  const reservaIds = await fetchReservas(fromDate, toDate, skip, limit);
 
-  for (const reserva of reservas) {
-    // Transformar e salvar dados da reserva
-    const reservaData = transformReserva(reserva);
-    const agenteDetalhado = transformAgente(reserva.agent);
-    const hospedeDetalhado = reserva._idclient ? await fetchHospedeDetalhado(reserva._idclient) : null;
+  for (const reservaId of reservaIds) {
+    // Obter os detalhes completos da reserva
+    const reservaDetalhada = await fetchReservaDetalhada(reservaId);
 
-    // Buscar e salvar dados do imóvel relacionado à reserva
+    if (!reservaDetalhada) {
+      console.warn(`Detalhes da reserva ${reservaId} não encontrados.`);
+      continue;
+    }
+
+    // Transformar e salvar os dados da reserva
+    const reservaData = transformReserva(reservaDetalhada);
+    const agenteDetalhado = transformAgente(reservaDetalhada.agent);
+    const hospedeDetalhado = reservaDetalhada._idclient ? await fetchHospedeDetalhado(reservaDetalhada._idclient) : null;
+
     let imovelId: number | null = null;
-    if (reserva._idlisting) {
-      const imovelDetalhado = await fetchImovelDetalhado(reserva._idlisting);
+    if (reservaDetalhada._idlisting) {
+      const imovelDetalhado = await fetchImovelDetalhado(reservaDetalhada._idlisting);
       if (imovelDetalhado) {
         const imovelSalvo = await salvarImovel(imovelDetalhado);
-        imovelId = imovelSalvo.id; // Associar o ID do imóvel salvo à reserva
-
-        // Buscar e salvar o condomínio relacionado ao imóvel
-        if (imovelDetalhado._idproperty) {
-          const condominioDetalhado = await fetchCondominioDetalhado(imovelDetalhado._idproperty);
-          if (condominioDetalhado) {
-            await salvarCondominio(condominioDetalhado);
-          }
-        }
+        imovelId = imovelSalvo.id;
       }
     }
 
-    // Atualizar o campo imovelId na reserva
     reservaData.imovelId = imovelId;
 
     // Salvar a reserva, o agente e o hóspede
@@ -44,10 +43,17 @@ export async function processarReservas(fromDate: string, toDate: string, skip: 
     if (hospedeDetalhado) {
       await salvarHospede(hospedeDetalhado, reservaSalva.id);
     }
+    /*
+    // Salvar dados de taxas extras
+    if (reservaDetalhada.price.extrasDetails.fees.length > 0) {
+      await salvarTaxasExtras(reservaSalva.id, reservaDetalhada.price.extrasDetails.fees);
+    }
+    */
   }
 
   console.log('Processamento de reservas concluído.');
 }
+
 
 // Execução principal
 (async () => {
