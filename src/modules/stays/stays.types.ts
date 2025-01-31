@@ -32,9 +32,8 @@ export interface ReservaData {
   linkStays: string;
   idImovelStays: string; // ID do imóvel na Stays
   imovelId: number | null; // ID do imóvel relacionado no banco de dados
-  canaisTitulo: string;
-  agenteId: string | null;
-  origem: string;
+  canalId: number | null; // ID do canal relacionado no banco de dados
+  origem: string; // Mantendo origem da reserva
   status: string;
   condominio: string;
   regiao: string;
@@ -62,4 +61,17 @@ export interface CondominioDetalhado {
   id: string;          // ID interno na Stays
   internalName: string; // Nome interno ou SKU do condomínio
   regiao: string;       // Região do condomínio
+}
+
+// Tipo para os detalhes da taxa de reserva
+export interface TaxaReservaDetalhada {
+  reservaId: number;     // ID da reserva relacionada no banco de dados
+  name: string;          // Nome da taxa (ex.: Taxa de Limpeza, ISS)
+  valor: number;         // Valor da taxa
+}
+
+// Tipo para os detalhes do canal obtidos na API Stays
+export interface CanalDetalhado {
+  _id: string;   // ID externo do canal (partner._id)
+  titulo: string; // Nome do canal (partner.name)
 }

@@ -1,7 +1,7 @@
 import prisma from '../../../config/database';
-import { ReservaData, HospedeDetalhado, AgenteDetalhado, ImovelDetalhado, CondominioDetalhado } from '../stays.types';
+import { ReservaData, HospedeDetalhado, AgenteDetalhado, ImovelDetalhado, CondominioDetalhado, TaxaReservaDetalhada, CanalDetalhado } from '../stays.types';
 
-export async function salvarReserva(reserva: ReservaData, agente: AgenteDetalhado | null) {
+export async function salvarReserva(reserva: ReservaData, agente: AgenteDetalhado | null, canal: CanalDetalhado | null) {
   if (agente) {
     await prisma.agente.upsert({
       where: { idExterno: agente._id },
@@ -14,12 +14,31 @@ export async function salvarReserva(reserva: ReservaData, agente: AgenteDetalhad
     });
   }
 
+  let canalSalvo = null;
+  if (canal) {
+    canalSalvo = await prisma.canal.upsert({
+      where: { idExterno: canal._id },
+      update: { titulo: canal.titulo },
+      create: {
+        idExterno: canal._id,
+        titulo: canal.titulo,
+      },
+    });
+  }
+
   return await prisma.reserva.upsert({
     where: { localizador: reserva.localizador },
-    update: reserva,
-    create: reserva,
+    update: {
+      ...reserva,
+      canalId: canalSalvo ? canalSalvo.id : null, // Agora associando corretamente o ID do canal salvo
+    },
+    create: {
+      ...reserva,
+      canalId: canalSalvo ? canalSalvo.id : null, // Agora associando corretamente o ID do canal salvo
+    },
   });
 }
+
 
 export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId: number) {
   if (hospede) {
@@ -102,3 +121,38 @@ export async function salvarCondominio(condominio: CondominioDetalhado) {
     throw new Error("Não foi possível salvar o condomínio.");
   }
 }
+
+/**
+ * Salva ou atualiza as taxas de reserva no banco de dados.
+ * @param taxas - Array de taxas relacionadas à reserva.
+ */
+export async function salvarTaxasReserva(taxas: TaxaReservaDetalhada[]) {
+  try {
+    for (const taxa of taxas) {
+      if (!taxa.name || typeof taxa.name !== 'string') {
+        console.warn(`Taxa inválida encontrada: ${JSON.stringify(taxa)}`);
+        continue; // Ignorar taxa inválida
+      }
+
+      await prisma.taxaReserva.upsert({
+        where: {
+          reservaId_name: { reservaId: taxa.reservaId, name: taxa.name }, // Chave única
+        },
+        update: {
+          valor: taxa.valor, // Atualiza o valor se já existir
+        },
+        create: {
+          reservaId: taxa.reservaId,
+          name: taxa.name,
+          valor: taxa.valor,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao salvar taxas de reserva:', error);
+    throw new Error('Não foi possível salvar as taxas de reserva.');
+  }
+}
+
+
+

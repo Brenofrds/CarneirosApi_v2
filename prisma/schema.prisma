@@ -52,7 +52,6 @@ model Reserva {
   partnerCode          String?
   linkStays            String
   idImovelStays        String
-  canaisTitulo         String
   agenteId             String?
   origem               String
   status               String
@@ -63,6 +62,9 @@ model Reserva {
   imovelId             Int?      // Tornar opcional
   imovel               Imovel?   @relation(fields: [imovelId], references: [id]) // Relação opcional com Imovel
   agente               Agente?   @relation(fields: [agenteId], references: [idExterno])
+  taxasReserva         TaxaReserva[] // Relação com a tabela TaxaReserva
+  canalId              Int? // Relacionamento com o canal
+  canal                Canal? @relation(fields: [canalId], references: [id]) // Relação opcional com Canal
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
 }
 
@@ -77,7 +79,6 @@ model Imovel {
   sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
 }
 
-
 model Condominio {
   id                   Int       @id @default(autoincrement())
   idExterno            String    @unique // ID externo (_id) do condomínio na Stays
@@ -85,4 +86,21 @@ model Condominio {
   sku                  String    // Nome interno ou SKU do condomínio (internalName)
   regiao               String    // Região do condomínio
   sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
+}
+
+model TaxaReserva {
+  id          Int      @id @default(autoincrement())
+  reservaId   Int      // Relacionado à tabela Reserva
+  name        String   // Nome da taxa
+  valor       Float    // Valor da taxa
+  reserva     Reserva  @relation(fields: [reservaId], references: [id])
+
+  @@unique([reservaId, name]) // Evita duplicação de taxas para a mesma reserva
+}
+
+model Canal {
+  id         Int      @id @default(autoincrement())
+  idExterno  String   @unique  // ID externo do canal (partner._id)
+  titulo     String   // Nome do canal (partner.name)
+  reservas   Reserva[] // Relação com reservas (1 Canal -> N Reservas)
 }
