@@ -85,7 +85,7 @@ export async function processarReservas(fromDate: string, toDate: string, skip: 
 
 // Execução principal
 (async () => {
-  await processarReservas('2024-03-01', '2024-03-28', 0, 30);
+  await processarReservas('2024-03-01', '2024-03-28', 0, 10);
 })();
 
 
