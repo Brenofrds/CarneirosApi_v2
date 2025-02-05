@@ -1,6 +1,6 @@
-import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado, fetchCondominioDetalhado } from './services/fetchService';
-import { transformReserva, transformAgente } from './services/transformService';
-import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio } from './services/saveService';
+import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado, fetchCondominioDetalhado, fetchReservaDetalhada } from './services/fetchService';
+import { transformReserva, transformAgente, transformCanal } from './services/transformService';
+import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva } from './services/saveService';
 
 /**
  * Processa as reservas, incluindo agentes, hóspedes, imóveis e condomínios.
@@ -10,54 +10,82 @@ import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio } from './
  * @param limit - Limite de registros a buscar.
  */
 export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
-  // Buscar apenas os IDs das reservas
-  const reservaIds = await fetchReservas(fromDate, toDate, skip, limit);
+  try {
+    // Buscar apenas os IDs das reservas
+    const reservaIds = await fetchReservas(fromDate, toDate, skip, limit);
 
-  for (const reservaId of reservaIds) {
-    // Obter os detalhes completos da reserva
-    const reservaDetalhada = await fetchReservaDetalhada(reservaId);
+    for (const reservaId of reservaIds) {
+      // Obter os detalhes completos da reserva
+      const reservaDetalhada = await fetchReservaDetalhada(reservaId);
 
-    if (!reservaDetalhada) {
-      console.warn(`Detalhes da reserva ${reservaId} não encontrados.`);
-      continue;
-    }
-
-    // Transformar e salvar os dados da reserva
-    const reservaData = transformReserva(reservaDetalhada);
-    const agenteDetalhado = transformAgente(reservaDetalhada.agent);
-    const hospedeDetalhado = reservaDetalhada._idclient ? await fetchHospedeDetalhado(reservaDetalhada._idclient) : null;
-
-    let imovelId: number | null = null;
-    if (reservaDetalhada._idlisting) {
-      const imovelDetalhado = await fetchImovelDetalhado(reservaDetalhada._idlisting);
-      if (imovelDetalhado) {
-        const imovelSalvo = await salvarImovel(imovelDetalhado);
-        imovelId = imovelSalvo.id;
+      if (!reservaDetalhada) {
+        console.warn(`Detalhes da reserva ${reservaId} não encontrados.`);
+        continue;
       }
+
+      // Transformar os dados da reserva
+      const reservaData = transformReserva(reservaDetalhada);
+      const agenteDetalhado = transformAgente(reservaDetalhada.agent);
+      const canalDetalhado = transformCanal(reservaDetalhada.partner);
+      const hospedeDetalhado = reservaDetalhada._idclient 
+        ? await fetchHospedeDetalhado(reservaDetalhada._idclient) 
+        : null;
+
+      let imovelId: number | null = null;
+      if (reservaDetalhada._idlisting) {
+        // Buscar detalhes do imóvel
+        const imovelDetalhado = await fetchImovelDetalhado(reservaDetalhada._idlisting);
+        if (imovelDetalhado) {
+          // Salvar o imóvel e associar o ID
+          const imovelSalvo = await salvarImovel(imovelDetalhado);
+          imovelId = imovelSalvo.id;
+
+          // Buscar e salvar o condomínio relacionado, se aplicável
+          if (imovelDetalhado._idproperty) {
+            const condominioDetalhado = await fetchCondominioDetalhado(imovelDetalhado._idproperty);
+            if (condominioDetalhado) {
+              await salvarCondominio(condominioDetalhado);
+            }
+          }
+        }
+      }
+
+      // Atualizar o campo `imovelId` na reserva
+      reservaData.imovelId = imovelId;
+
+      // Salvar a reserva
+      const reservaSalva = await salvarReserva(reservaData, agenteDetalhado, canalDetalhado);
+
+      // Salvar o hóspede associado à reserva
+      if (hospedeDetalhado) {
+        await salvarHospede(hospedeDetalhado, reservaSalva.id);
+      }
+
+      // Consolidar as taxas de `hostingDetails` e `extrasDetails`
+      const taxas = [
+        ...(reservaDetalhada.price.hostingDetails?.fees || []),
+        ...(reservaDetalhada.price.extrasDetails?.fees || []),
+      ].map((taxa: { name: string; _f_val: number }) => ({
+        reservaId: reservaSalva.id, // Associar o ID da reserva
+        name: taxa.name?.trim() || 'Taxa Desconhecida', // Nome da taxa (ou um padrão)
+        valor: taxa._f_val,
+      }));
+
+      // Salvar as taxas de reserva
+      await salvarTaxasReserva(taxas);
     }
 
-    reservaData.imovelId = imovelId;
-
-    // Salvar a reserva, o agente e o hóspede
-    const reservaSalva = await salvarReserva(reservaData, agenteDetalhado);
-    if (hospedeDetalhado) {
-      await salvarHospede(hospedeDetalhado, reservaSalva.id);
-    }
-    /*
-    // Salvar dados de taxas extras
-    if (reservaDetalhada.price.extrasDetails.fees.length > 0) {
-      await salvarTaxasExtras(reservaSalva.id, reservaDetalhada.price.extrasDetails.fees);
-    }
-    */
+    console.log('Processamento de reservas concluído.');
+  } catch (error: any) {
+    console.error('Erro ao processar reservas:', error.message || error);
   }
-
-  console.log('Processamento de reservas concluído.');
 }
+
 
 
 // Execução principal
 (async () => {
-  await processarReservas('2024-02-01', '2024-02-28', 0, 30);
+  await processarReservas('2024-03-01', '2024-03-28', 0, 10);
 })();
 
 

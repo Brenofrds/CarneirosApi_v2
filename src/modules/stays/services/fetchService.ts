@@ -1,5 +1,5 @@
 import staysClient from '../../../config/staysClient';
-import { HospedeDetalhado, ReservaData, AgenteDetalhado, ImovelDetalhado, CondominioDetalhado } from '../stays.types';
+import { HospedeDetalhado, ReservaData, AgenteDetalhado, ImovelDetalhado, CondominioDetalhado, CanalDetalhado } from '../stays.types';
 
 export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDetalhado | null> {
   try {
