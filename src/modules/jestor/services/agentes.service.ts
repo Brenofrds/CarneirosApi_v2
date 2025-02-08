@@ -2,16 +2,15 @@ import jestorClient from '../../../config/jestorClient';
 import prisma from '../../../config/database';
 import { getAgentesNaoSincronizados } from '../../database/models';
 
+const ENDPOINT_LIST = '/object/list';
+const ENDPOINT_CREATE = '/object/create';
+const JESTOR_AGENTE = '1jxekmijxza61ygtgadfi';
+
 /**
  * Verifica se um agente com o nome fornecido já existe na tabela do Jestor.
  * @param nome - Nome do agente a ser verificado.
  * @returns - Um boolean indicando se o agente já existe no Jestor.
  */
-
-const ENDPOINT_LIST = '/object/list';
-const ENDPOINT_CREATE = '/object/create';
-const JESTOR_AGENTE = '1jxekmijxza61ygtgadfi';
-
 
 export async function verificarAgenteNoJestor(nome: string) {
     try {
@@ -76,6 +75,7 @@ export async function inserirAgenteNoJestor(agente: {
 export async function sincronizarAgentes() {
     try {
         const agentesNaoSincronizados = await getAgentesNaoSincronizados();
+        
         if(agentesNaoSincronizados){
             for (const agente of agentesNaoSincronizados) {
                 const existeNoJestor = await verificarAgenteNoJestor(agente.nome);
@@ -93,7 +93,7 @@ export async function sincronizarAgentes() {
                     });
 
                     console.log("--------------------------------------------------");
-                    console.log(`Agente ${agente.nome} sincronizado com sucesso!`);
+                    console.log(`Agente ${agente.nome}\nSincronizado com sucesso!`);
                     console.log("--------------------------------------------------");
                 } else {
                     // Se já existe no Jestor, atualiza o status no banco local para sincronizado
