@@ -1,12 +1,10 @@
 import jestorClient from '../../../config/jestorClient';
-import prisma from '../../../config/database';
 import { typeReserva } from '../jestor.types'; 
-import { getReservasNaoSincronizados } from '../../database/models';
+import { atualizaCampoSincronizadoNoJestor, getReservasNaoSincronizados } from '../../database/models';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const JESTOR_TB_RESERVA = 'e4sqtj0lt_yjxd075da5t';
-//const JESTOR_RESERVA = 'oplicg48civ1tjt96g6e7';//nao utilizada
 
 /**
  * Verifica se uma reserva com o LOCALIZADOR fornecido já existe na tabela do Jestor.
@@ -14,7 +12,10 @@ const JESTOR_TB_RESERVA = 'e4sqtj0lt_yjxd075da5t';
  * @returns - Um boolean indicando se a reserva já existe no Jestor.
  */
 
-export async function verificarReservaNoJestor(localizador: string, idExterno: string) {
+export async function verificarReservaNoJestor(
+    localizador: string, 
+    idExterno: string
+) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_RESERVA, // ID da tabela no Jestor
@@ -120,25 +121,16 @@ export async function sincronizarReserva() {
                 if (!existeNoJestor) {
                     await inserirReservaNoJestor(reserva);
 
-                    // Atualiza o status no banco local
-                    await prisma.reserva.update({
-                        where: { localizador: reserva.localizador },
-                        data: { sincronizadoNoJestor: true },
-                    });
-                    
                     console.log("--------------------------------------------------");    
                     console.log(`Reserva: ${reserva.localizador}\nSincronizado com sucesso!`);
                     console.log("--------------------------------------------------");
                 } else {
-                    // Se já existe no Jestor, atualiza o status no banco local para sincronizado
-                    await prisma.reserva.update({
-                        where: { id: reserva.id },
-                        data: { sincronizadoNoJestor: true },
-                    });
                     console.log("--------------------------------------------------");
                     console.log(`Reserva: ${reserva.localizador}\nJa existe no Jestor. Atualizado no banco local.`);
                     console.log("--------------------------------------------------");
                 }
+                // Atualiza o status no banco local para sincronizado
+                await atualizaCampoSincronizadoNoJestor('reserva', reserva.localizador);
             }
         }
     } catch (error: any) {
