@@ -6,7 +6,7 @@ import prisma from '../../config/database';
  * @param Id - valor do campo usado para encontrar o registro
  */
 export async function atualizaCampoSincronizadoNoJestor(
-    tabela: string,
+    tabela: string | number,
     id: string
 ) {
     try{

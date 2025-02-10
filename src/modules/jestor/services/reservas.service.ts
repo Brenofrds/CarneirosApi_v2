@@ -54,7 +54,7 @@ export async function verificarReservaNoJestor(
  * Insere uma reserva no Jestor.
  * @param reserva - Dados da reserva a serem inseridos.
  */
-export async function inserirReservaNoJestor(reserva: typeReserva){
+export async function inserirReservaNoJestor(reserva: typeReserva) {
     
     try {
         // nome do campo no Jestor | nome do campo no banco de dados local
@@ -88,10 +88,11 @@ export async function inserirReservaNoJestor(reserva: typeReserva){
             imovel_oficial_sku: reserva.imovelOficialSku,//imovelOficialSku = imovelId [?]
         };
 
-        //Se ImovelId e CanalId forem null, nao adicionamos ao objeto que que sera enviado ao jestor
+        // Se ImovelId e CanalId forem null, nao adicionamos ao objeto que que sera enviado ao jestor
         if(reserva.imovelId !== null) data.id_imovel = reserva.imovelId;
         if(reserva.canalId !== null) data.canal = reserva.canalId;
 
+        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
             object_type: JESTOR_TB_RESERVA, // ID da tabela no Jestor
             data,
@@ -101,6 +102,7 @@ export async function inserirReservaNoJestor(reserva: typeReserva){
         console.log('Reserva inserida no Jestor:\n\n', response.data);
         console.log("--------------------------------------------------");
         return response.data; // Retorna o dado inserido
+        
     } catch (error: any) {
         console.error('Erro ao inserir reserva no Jestor:', error?.response?.data || error.message || error);
         throw new Error('Erro ao inserir reserva no Jestor');
@@ -138,9 +140,8 @@ export async function sincronizarReserva() {
     }
 }
 
-
 /*funcao de teste
-*/
 (async () => {
     await sincronizarReserva();
 })();
+*/

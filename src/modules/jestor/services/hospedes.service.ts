@@ -1,10 +1,10 @@
 import jestorClient from '../../../config/jestorClient';
-import prisma from '../../../config/database';
-import { getHospedesNaoSincronizados } from '../../database/models';
+import { typeHospede } from '../jestor.types'; 
+import { atualizaCampoSincronizadoNoJestor, getHospedesNaoSincronizados } from '../../database/models';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
-const JESTOR_HOSPEDE = 'b_d6pu1giq_jb0gd7f0ed';
+const JESTOR_TB_HOSPEDE = 'b_d6pu1giq_jb0gd7f0ed';
 
 /**
  * Verifica se um hospede com o nome fornecido já existe na tabela do Jestor.
@@ -12,10 +12,14 @@ const JESTOR_HOSPEDE = 'b_d6pu1giq_jb0gd7f0ed';
  * @returns - Um boolean indicando se o hospede já existe no Jestor.
  */
 
-export async function verificarHospedesNoJestor(nome: string, idExterno: string | null, reservaId: number) {
+export async function verificarHospedeNoJestor(
+    nome: string, 
+    idExterno: string | null, 
+    reservaId: number
+) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_HOSPEDE, // ID da tabela no Jestor
+            object_type: JESTOR_TB_HOSPEDE, // ID da tabela no Jestor
             filters: [
                         {
                             field: 'nomecompleto', // Nome do campo no Jestor
@@ -57,38 +61,33 @@ export async function verificarHospedesNoJestor(nome: string, idExterno: string 
  * Insere um hospede no Jestor.
  * @param hospede - Dados do hospede a serem inseridos.
  */
-export async function inserirHospedesNoJestor(hospede: {
-    id: number;
-    idExterno: string;
-    nomeCompleto: string;
-    email: string | null;
-    dataDeNascimento: string | null;
-    telefone: string | null;
-    cpf: string | null;
-    documento: string | null;
-    reservaId: number;
-}) {
+export async function inserirHospedeNoJestor(hospede: typeHospede) {
+ 
     try {
+        // nome do campo no Jestor | nome do campo no banco de dados local
+        const data: any = {
+            name: hospede.id, // ID do banco da API EngNet
+            idexterno: hospede.idExterno,
+            nomecompleto: hospede.nomeCompleto,
+            email: hospede.email,
+            datanascimento: hospede.dataDeNascimento,
+            telefone: hospede.telefone,
+            cpf: hospede.cpf,
+            documento: hospede.documento,
+            id_reserva: hospede.reservaId,
+        };
+
+        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_HOSPEDE, // ID da tabela no Jestor
-            data: {
-                // nome do campo no Jestor | nome do campo no banco de dados local
-                name: hospede.id, // ID do banco da API EngNet
-                idexterno: hospede.idExterno,
-                nomecompleto: hospede.nomeCompleto,
-                email: hospede.email,
-                datanascimento: hospede.dataDeNascimento,
-                telefone: hospede.telefone,
-                cpf: hospede.cpf,
-                documento: hospede.documento,
-                id_reserva: hospede.reservaId,
-            },
+            object_type: JESTOR_TB_HOSPEDE, // ID da tabela no Jestor
+            data,
         });
 
         console.log("--------------------------------------------------");
         console.log('Hospede inserido no Jestor:\n\n', response.data);
         console.log("--------------------------------------------------");
         return response.data; // Retorna o dado inserido
+
     } catch (error: any) {
         console.error('Erro ao inserir hospede no Jestor:', error.response?.data || error.message);
         throw new Error('Erro ao inserir hospede no Jestor');
@@ -98,46 +97,28 @@ export async function inserirHospedesNoJestor(hospede: {
 /**
  * Sincroniza os hospedes não sincronizados do banco local com o Jestor.
  */
-export async function sincronizarHospedes() {
+export async function sincronizarHospede() {
     try {
         const hospedesNaoSincronizados = await getHospedesNaoSincronizados();
 
         if(hospedesNaoSincronizados){
             for (const hospede of hospedesNaoSincronizados) {
-                const existeNoJestor = await verificarHospedesNoJestor(hospede.nomeCompleto, hospede.idExterno, hospede.reservaId);
+                const existeNoJestor = await verificarHospedeNoJestor(hospede.nomeCompleto, hospede.idExterno, hospede.reservaId);
        
                 if (!existeNoJestor) {
-                    await inserirHospedesNoJestor({
-                        id: hospede.id, // ID do banco da API EngNet
-                        idExterno: hospede.idExterno,
-                        nomeCompleto: hospede.nomeCompleto,
-                        email: hospede.email,
-                        dataDeNascimento: hospede.dataDeNascimento,
-                        telefone: hospede.telefone,
-                        cpf: hospede.cpf,
-                        documento: hospede.documento,
-                        reservaId: hospede.reservaId,
-                    });
+                    await inserirHospedeNoJestor(hospede);
 
-                    // Atualiza o status no banco local
-                    await prisma.hospede.update({
-                        where: { id: hospede.id },
-                        data: { sincronizadoNoJestor: true },
-                    });
-                    
                     console.log("--------------------------------------------------");    
                     console.log(`Hospede: ${hospede.nomeCompleto}\nSincronizado com sucesso!`);
                     console.log("--------------------------------------------------");
                 } else {
-                    // Se já existe no Jestor, atualiza o status no banco local para sincronizado
-                    await prisma.hospede.update({
-                        where: { id: hospede.id },
-                        data: { sincronizadoNoJestor: true },
-                    });
-                    console.log("--------------------------------------------------");    
+
+                    console.log("--------------------------------------------------");
                     console.log(`Hospede: ${hospede.nomeCompleto}\nJa existe no Jestor. Atualizado no banco local.`);
                     console.log("--------------------------------------------------");
                 }
+                // Atualiza o status no banco local para sincronizado
+                await atualizaCampoSincronizadoNoJestor('hospede', hospede.idExterno);
             }
         }
     } catch (error: any) {
@@ -145,11 +126,11 @@ export async function sincronizarHospedes() {
     }
 }
 
-/*funcao de teste*/
+/*funcao de teste
 (async () => {
-  await sincronizarHospedes();
+  await sincronizarHospede();
 })();
-
+*/
 
 /** Usar esse codigo se precisar fazer filtro por algum campo que
  * pode estar nulo.

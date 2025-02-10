@@ -1,10 +1,10 @@
 import jestorClient from '../../../config/jestorClient';
-import prisma from '../../../config/database';
-import { getAgentesNaoSincronizados } from '../../database/models';
+import { typeAgente } from '../jestor.types';
+import { atualizaCampoSincronizadoNoJestor, getAgentesNaoSincronizados } from '../../database/models';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
-const JESTOR_AGENTE = '1jxekmijxza61ygtgadfi';
+const JESTOR_TB_AGENTE = '1jxekmijxza61ygtgadfi';
 
 /**
  * Verifica se um agente com o nome fornecido já existe na tabela do Jestor.
@@ -15,7 +15,7 @@ const JESTOR_AGENTE = '1jxekmijxza61ygtgadfi';
 export async function verificarAgenteNoJestor(nome: string) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_AGENTE, // ID da tabela no Jestor
+            object_type: JESTOR_TB_AGENTE, // ID da tabela no Jestor
             filters: [
                 {
                     field: 'name', // Nome do campo no Jestor
@@ -46,23 +46,28 @@ export async function verificarAgenteNoJestor(nome: string) {
  * Insere um agente no Jestor.
  * @param agente - Dados do agente a serem inseridos.
  */
-export async function inserirAgenteNoJestor(agente: {
-    id: number;
-    nome: string;
-}) {
+export async function inserirAgenteNoJestor(agente: typeAgente) {
+
     try {
+        // nome do campo no Jestor | nome do campo no banco de dados local
+        const data: any = {
+            id_api_engnet: agente.id,
+            id_externo: agente.idExterno,
+            name: agente.nome,
+            //: reservas,
+        }
+
+        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_AGENTE, // ID da tabela no Jestor
-            data: {
-                id_api_engnet: agente.id, // ID do banco da API EngNet
-                name: agente.nome, // Nome do agente
-            },
+            object_type: JESTOR_TB_AGENTE, // ID da tabela no Jestor
+            data,
         });
 
         console.log("--------------------------------------------------");
         console.log('Agente inserido no Jestor:\n\n', response.data);
         console.log("--------------------------------------------------");
         return response.data; // Retorna o dado inserido
+
     } catch (error: any) {
         console.error('Erro ao inserir agente no Jestor:', error.response?.data || error.message);
         throw new Error('Erro ao inserir agente no Jestor');
@@ -72,7 +77,7 @@ export async function inserirAgenteNoJestor(agente: {
 /**
  * Sincroniza os agentes não sincronizados do banco local com o Jestor.
  */
-export async function sincronizarAgentes() {
+export async function sincronizarAgente() {
     try {
         const agentesNaoSincronizados = await getAgentesNaoSincronizados();
         
@@ -81,31 +86,18 @@ export async function sincronizarAgentes() {
                 const existeNoJestor = await verificarAgenteNoJestor(agente.nome);
 
                 if (!existeNoJestor) {
-                    await inserirAgenteNoJestor({
-                        id: agente.id, // ID do banco local
-                        nome: agente.nome,
-                    });
-
-                    // Atualiza o status no banco local
-                    await prisma.agente.update({
-                        where: { id: agente.id },
-                        data: { sincronizadoNoJestor: true },
-                    });
-
+                    await inserirAgenteNoJestor(agente);
+                    
                     console.log("--------------------------------------------------");
                     console.log(`Agente ${agente.nome}\nSincronizado com sucesso!`);
                     console.log("--------------------------------------------------");
                 } else {
-                    // Se já existe no Jestor, atualiza o status no banco local para sincronizado
-                    await prisma.agente.update({
-                        where: { id: agente.id },
-                        data: { sincronizadoNoJestor: true },
-                    });
-                    
                     console.log("--------------------------------------------------");
                     console.log(`Agente: ${agente.nome}\nJa existe no Jestor. Atualizado no banco local.`);
                     console.log("--------------------------------------------------");
                 }
+                // Atualiza o status no banco local para sincronizado
+                await atualizaCampoSincronizadoNoJestor('agente', agente.idExterno);
             }
         }
     } catch (error: any) {
@@ -113,8 +105,7 @@ export async function sincronizarAgentes() {
     }
 }
 
-/*funcao de teste
+/*funcao de teste*/
 (async () => {
-  await sincronizarAgentes();
+  await sincronizarAgente();
 })();
-*/
