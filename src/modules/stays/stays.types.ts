@@ -33,6 +33,7 @@ export interface ReservaData {
   idImovelStays: string; // ID do imóvel na Stays
   imovelId: number | null; // ID do imóvel relacionado no banco de dados
   canalId: number | null; // ID do canal relacionado no banco de dados
+  agenteId: string | null;
   origem: string; // Mantendo origem da reserva
   status: string;
   condominio: string;

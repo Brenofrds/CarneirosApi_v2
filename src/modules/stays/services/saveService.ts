@@ -1,6 +1,7 @@
 import prisma from '../../../config/database';
 import { ReservaData, HospedeDetalhado, AgenteDetalhado, ImovelDetalhado, CondominioDetalhado, TaxaReservaDetalhada, CanalDetalhado } from '../stays.types';
 
+
 export async function salvarReserva(reserva: ReservaData, agente: AgenteDetalhado | null, canal: CanalDetalhado | null) {
   if (agente) {
     await prisma.agente.upsert({
@@ -94,11 +95,7 @@ export async function salvarImovel(imovel: ImovelDetalhado) {
 }
 
 
-/**
- * Salva ou atualiza os dados do condomínio no banco de dados.
- * @param condominio - Detalhes do condomínio a serem salvos.
- * @returns O registro do condomínio salvo ou atualizado.
- */
+
 export async function salvarCondominio(condominio: CondominioDetalhado) {
   try {
     return await prisma.condominio.upsert({
@@ -122,10 +119,8 @@ export async function salvarCondominio(condominio: CondominioDetalhado) {
   }
 }
 
-/**
- * Salva ou atualiza as taxas de reserva no banco de dados.
- * @param taxas - Array de taxas relacionadas à reserva.
- */
+
+
 export async function salvarTaxasReserva(taxas: TaxaReservaDetalhada[]) {
   try {
     for (const taxa of taxas) {
@@ -156,3 +151,90 @@ export async function salvarTaxasReserva(taxas: TaxaReservaDetalhada[]) {
 
 
 
+
+/**
+ * NOVO CODIGO ABAIXO
+ */
+/*
+export const createReservation = async (payload: any) => {
+  console.log("🔹 Criando nova reserva...");
+
+  try {
+    const reservation = await saveReservation(payload);
+    console.log("✅ Reserva criada com sucesso:", reservation);
+    return reservation;
+  } catch (error) {
+    console.error("Erro ao criar reserva:", error);
+    throw new Error("Erro ao criar reserva.");
+  }
+};
+
+export const updateReservation = async (payload: any) => {
+  console.log("🔹 Atualizando reserva existente...");
+
+  try {
+    const reservation = await saveReservation(payload);
+    console.log("✅ Reserva atualizada com sucesso:", reservation);
+    return reservation;
+  } catch (error) {
+    console.error("Erro ao atualizar reserva:", error);
+    throw new Error("Erro ao atualizar reserva.");
+  }
+};
+
+const saveReservation = async (payload: any) => {
+  // 🔹 Transformação dos dados
+  const reservaData = transformReserva(payload);
+  const agenteData = transformAgente(payload.agent);
+  const canalData = transformCanal(payload.partner);
+
+  // 1️⃣ Criar/Atualizar o Agente
+  let agenteSalvo = null;
+  if (agenteData) {
+    agenteSalvo = await prisma.agente.upsert({
+      where: { idExterno: agenteData._id },
+      update: { nome: agenteData.name },
+      create: {
+        idExterno: agenteData._id,
+        nome: agenteData.name,
+        sincronizadoNoJestor: false,
+      },
+    });
+  }
+
+  // 2️⃣ Criar/Atualizar o Canal
+  let canalSalvo = null;
+  if (canalData) {
+    canalSalvo = await prisma.canal.upsert({
+      where: { idExterno: canalData._id },
+      update: { titulo: canalData.titulo },
+      create: {
+        idExterno: canalData._id,
+        titulo: canalData.titulo,
+      },
+    });
+  }
+
+  // 3️⃣ Associar IDs do agente e canal na reserva
+  reservaData.agenteId = agenteSalvo ? agenteSalvo.idExterno : null;
+  reservaData.canalId = canalSalvo ? canalSalvo.id : null;
+
+  // 4️⃣ Criar/Atualizar a Reserva no Banco de Dados
+  const reservaSalva = await prisma.reserva.upsert({
+    where: { idExterno: reservaData.idExterno },
+    update: reservaData,
+    create: reservaData,
+  });
+
+  // 5️⃣ Criar/Atualizar as Taxas de Reserva
+  const taxasReservas = transformTaxasReserva(payload, reservaSalva.id);
+  if (taxasReservas.length > 0) {
+    await prisma.taxaReserva.createMany({
+      data: taxasReservas,
+      skipDuplicates: true, // Evita duplicações no banco
+    });
+  }
+
+  return reservaSalva;
+};
+*/

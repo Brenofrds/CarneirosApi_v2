@@ -15,6 +15,7 @@ async function clearDatabase() {
     await prisma.agente.deleteMany({});
     await prisma.imovel.deleteMany({});
     await prisma.condominio.deleteMany({});
+    await prisma.canal.deleteMany({});
 
     console.log('Banco de dados limpo com sucesso!');
   } catch (error) {
