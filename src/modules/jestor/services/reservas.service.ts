@@ -140,8 +140,7 @@ export async function sincronizarReserva() {
     }
 }
 
-/*funcao de teste
+/*funcao de teste*/
 (async () => {
     await sincronizarReserva();
 })();
-*/
