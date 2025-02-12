@@ -9,7 +9,7 @@ datasource db {
 
 model Agente {
   id                   Int      @id @default(autoincrement())
-  idExterno              String   @unique // ID do agente na Stays
+  idExterno            String   @unique // ID do agente na Stays
   nome                 String
   sincronizadoNoJestor Boolean  @default(false) // Controle de sincronização com o Jestor
   reservas             Reserva[] // Relação com as reservas associadas

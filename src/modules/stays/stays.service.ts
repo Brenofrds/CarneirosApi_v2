@@ -1,6 +1,7 @@
 import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado, fetchCondominioDetalhado, fetchReservaDetalhada } from './services/fetchService';
 import { transformReserva, transformAgente, transformCanal } from './services/transformService';
-import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva } from './services/saveService';
+import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva } from "./services/saveService";
+import prisma from "../../config/database"; // Importa o cliente Prisma
 
 /**
  * Processa as reservas, incluindo agentes, hóspedes, imóveis e condomínios.
@@ -9,6 +10,7 @@ import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTax
  * @param skip - Quantidade de registros a ignorar para paginação.
  * @param limit - Limite de registros a buscar.
  */
+/*
 export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
   try {
     // Buscar apenas os IDs das reservas
@@ -81,12 +83,122 @@ export async function processarReservas(fromDate: string, toDate: string, skip: 
   }
 }
 
+*/
+
 
 
 // Execução principal
-(async () => {
-  await processarReservas('2024-03-01', '2024-03-28', 0, 10);
-})();
+// (async () => {
+//  await processarReservas('2024-11-01', '2025-02-05', 0, 2);
+// })();
+
+/**
+ * Novo codigoo
+ */
+
+
+
+/**
+ * Processa os dados recebidos pelo webhook
+ * @param body - Corpo da requisição do webhook
+ */
+export const processWebhookData = async (body: any) => {
+  const { action, payload } = body;
+  if (!action || !payload) throw new Error("Dados inválidos: 'action' ou 'payload' ausentes.");
+
+  switch (action) {
+    case "reservation.created":
+    case "reservation.modified":
+      return await processarReservaWebhook(payload); // Agora passamos o objeto inteiro
+
+    default:
+      throw new Error(`Ação desconhecida: ${action}`);
+  }
+};
+
+
+const processarReservaWebhook = async (payload: any) => {
+  try {
+    console.log(`📌 Processando webhook para reserva ${payload._id}`);
+
+    // 🔹 Transformar os dados da reserva
+    const reservaData = transformReserva(payload);
+    const agenteData = transformAgente(payload.agent);
+    const canalData = transformCanal(payload.partner);
+
+    // 🔹 Criar/Atualizar Agente
+    let agenteSalvo = null;
+    if (agenteData) {
+      agenteSalvo = await prisma.agente.upsert({
+        where: { idExterno: agenteData._id },
+        update: { nome: agenteData.name },
+        create: { idExterno: agenteData._id, nome: agenteData.name, sincronizadoNoJestor: false },
+      });
+    }
+
+    // 🔹 Criar/Atualizar Canal
+    let canalSalvo = null;
+    if (canalData) {
+      canalSalvo = await prisma.canal.upsert({
+        where: { idExterno: canalData._id },
+        update: { titulo: canalData.titulo },
+        create: { idExterno: canalData._id, titulo: canalData.titulo },
+      });
+    }
+
+    // 🔹 Buscar e salvar Imóvel
+    let imovelId = null;
+    if (payload._idlisting) {
+      const imovelDetalhado = await fetchImovelDetalhado(payload._idlisting);
+      if (imovelDetalhado) {
+        const imovelSalvo = await salvarImovel(imovelDetalhado);
+        imovelId = imovelSalvo.id;
+
+        // 🔹 Buscar e salvar Condomínio
+        if (imovelDetalhado._idproperty) {
+          const condominioDetalhado = await fetchCondominioDetalhado(imovelDetalhado._idproperty);
+          if (condominioDetalhado) {
+            await salvarCondominio(condominioDetalhado);
+          }
+        }
+      }
+    }
+
+    // 🔹 Atualiza a reserva com IDs dos relacionamentos
+    reservaData.imovelId = imovelId;
+    reservaData.agenteId = agenteSalvo?.idExterno ?? null;
+    reservaData.canalId = canalSalvo?.id ?? null;
+
+    const reservaSalva = await salvarReserva(
+      reservaData,
+      agenteSalvo ? { _id: agenteSalvo.idExterno, name: agenteSalvo.nome } : null,
+      canalSalvo ? { _id: canalSalvo.idExterno, titulo: canalSalvo.titulo || "" } : null // ✅ Agora sempre usando `idExterno`
+    );
+    
+    // 🔹 Salva Hóspede (depois de salvar a reserva!)
+    if (payload._idclient) {
+      const hospedeDetalhado = await fetchHospedeDetalhado(payload._idclient);
+      if (hospedeDetalhado) {
+        await salvarHospede(hospedeDetalhado, reservaSalva.id);
+      }
+    }
+
+    // 🔹 Salva Taxas da Reserva
+    const taxasReservas = payload.price?.extrasDetails?.fees?.map((taxa: { name: string; _f_val: number }) => ({
+      reservaId: reservaSalva.id,
+      name: taxa.name?.trim() || "Taxa Desconhecida",
+      valor: taxa._f_val,
+    })) || [];
+
+    await salvarTaxasReserva(taxasReservas);
+
+    return reservaSalva;
+  } catch (error) {
+    console.error("Erro ao processar reserva via webhook:", error);
+    throw new Error("Erro ao processar reserva.");
+  }
+};
+
 
 
 
