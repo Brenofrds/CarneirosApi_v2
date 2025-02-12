@@ -3,100 +3,6 @@ import { transformReserva, transformAgente, transformCanal } from './services/tr
 import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva } from "./services/saveService";
 import prisma from "../../config/database"; // Importa o cliente Prisma
 
-/**
- * Processa as reservas, incluindo agentes, hóspedes, imóveis e condomínios.
- * @param fromDate - Data inicial no formato YYYY-MM-DD.
- * @param toDate - Data final no formato YYYY-MM-DD.
- * @param skip - Quantidade de registros a ignorar para paginação.
- * @param limit - Limite de registros a buscar.
- */
-/*
-export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
-  try {
-    // Buscar apenas os IDs das reservas
-    const reservaIds = await fetchReservas(fromDate, toDate, skip, limit);
-
-    for (const reservaId of reservaIds) {
-      // Obter os detalhes completos da reserva
-      const reservaDetalhada = await fetchReservaDetalhada(reservaId);
-
-      if (!reservaDetalhada) {
-        console.warn(`Detalhes da reserva ${reservaId} não encontrados.`);
-        continue;
-      }
-
-      // Transformar os dados da reserva
-      const reservaData = transformReserva(reservaDetalhada);
-      const agenteDetalhado = transformAgente(reservaDetalhada.agent);
-      const canalDetalhado = transformCanal(reservaDetalhada.partner);
-      const hospedeDetalhado = reservaDetalhada._idclient 
-        ? await fetchHospedeDetalhado(reservaDetalhada._idclient) 
-        : null;
-
-      let imovelId: number | null = null;
-      if (reservaDetalhada._idlisting) {
-        // Buscar detalhes do imóvel
-        const imovelDetalhado = await fetchImovelDetalhado(reservaDetalhada._idlisting);
-        if (imovelDetalhado) {
-          // Salvar o imóvel e associar o ID
-          const imovelSalvo = await salvarImovel(imovelDetalhado);
-          imovelId = imovelSalvo.id;
-
-          // Buscar e salvar o condomínio relacionado, se aplicável
-          if (imovelDetalhado._idproperty) {
-            const condominioDetalhado = await fetchCondominioDetalhado(imovelDetalhado._idproperty);
-            if (condominioDetalhado) {
-              await salvarCondominio(condominioDetalhado);
-            }
-          }
-        }
-      }
-
-      // Atualizar o campo `imovelId` na reserva
-      reservaData.imovelId = imovelId;
-
-      // Salvar a reserva
-      const reservaSalva = await salvarReserva(reservaData, agenteDetalhado, canalDetalhado);
-
-      // Salvar o hóspede associado à reserva
-      if (hospedeDetalhado) {
-        await salvarHospede(hospedeDetalhado, reservaSalva.id);
-      }
-
-      // Consolidar as taxas de `hostingDetails` e `extrasDetails`
-      const taxas = [
-        ...(reservaDetalhada.price.hostingDetails?.fees || []),
-        ...(reservaDetalhada.price.extrasDetails?.fees || []),
-      ].map((taxa: { name: string; _f_val: number }) => ({
-        reservaId: reservaSalva.id, // Associar o ID da reserva
-        name: taxa.name?.trim() || 'Taxa Desconhecida', // Nome da taxa (ou um padrão)
-        valor: taxa._f_val,
-      }));
-
-      // Salvar as taxas de reserva
-      await salvarTaxasReserva(taxas);
-    }
-
-    console.log('Processamento de reservas concluído.');
-  } catch (error: any) {
-    console.error('Erro ao processar reservas:', error.message || error);
-  }
-}
-
-*/
-
-
-
-// Execução principal
-// (async () => {
-//  await processarReservas('2024-11-01', '2025-02-05', 0, 2);
-// })();
-
-/**
- * Novo codigoo
- */
-
-
 
 /**
  * Processa os dados recebidos pelo webhook
@@ -199,6 +105,99 @@ const processarReservaWebhook = async (payload: any) => {
   }
 };
 
+
+/**
+ * Processa as reservas, incluindo agentes, hóspedes, imóveis e condomínios.
+ * @param fromDate - Data inicial no formato YYYY-MM-DD.
+ * @param toDate - Data final no formato YYYY-MM-DD.
+ * @param skip - Quantidade de registros a ignorar para paginação.
+ * @param limit - Limite de registros a buscar.
+ */
+/*
+export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
+  try {
+    // Buscar apenas os IDs das reservas
+    const reservaIds = await fetchReservas(fromDate, toDate, skip, limit);
+
+    for (const reservaId of reservaIds) {
+      // Obter os detalhes completos da reserva
+      const reservaDetalhada = await fetchReservaDetalhada(reservaId);
+
+      if (!reservaDetalhada) {
+        console.warn(`Detalhes da reserva ${reservaId} não encontrados.`);
+        continue;
+      }
+
+      // Transformar os dados da reserva
+      const reservaData = transformReserva(reservaDetalhada);
+      const agenteDetalhado = transformAgente(reservaDetalhada.agent);
+      const canalDetalhado = transformCanal(reservaDetalhada.partner);
+      const hospedeDetalhado = reservaDetalhada._idclient 
+        ? await fetchHospedeDetalhado(reservaDetalhada._idclient) 
+        : null;
+
+      let imovelId: number | null = null;
+      if (reservaDetalhada._idlisting) {
+        // Buscar detalhes do imóvel
+        const imovelDetalhado = await fetchImovelDetalhado(reservaDetalhada._idlisting);
+        if (imovelDetalhado) {
+          // Salvar o imóvel e associar o ID
+          const imovelSalvo = await salvarImovel(imovelDetalhado);
+          imovelId = imovelSalvo.id;
+
+          // Buscar e salvar o condomínio relacionado, se aplicável
+          if (imovelDetalhado._idproperty) {
+            const condominioDetalhado = await fetchCondominioDetalhado(imovelDetalhado._idproperty);
+            if (condominioDetalhado) {
+              await salvarCondominio(condominioDetalhado);
+            }
+          }
+        }
+      }
+
+      // Atualizar o campo `imovelId` na reserva
+      reservaData.imovelId = imovelId;
+
+      // Salvar a reserva
+      const reservaSalva = await salvarReserva(reservaData, agenteDetalhado, canalDetalhado);
+
+      // Salvar o hóspede associado à reserva
+      if (hospedeDetalhado) {
+        await salvarHospede(hospedeDetalhado, reservaSalva.id);
+      }
+
+      // Consolidar as taxas de `hostingDetails` e `extrasDetails`
+      const taxas = [
+        ...(reservaDetalhada.price.hostingDetails?.fees || []),
+        ...(reservaDetalhada.price.extrasDetails?.fees || []),
+      ].map((taxa: { name: string; _f_val: number }) => ({
+        reservaId: reservaSalva.id, // Associar o ID da reserva
+        name: taxa.name?.trim() || 'Taxa Desconhecida', // Nome da taxa (ou um padrão)
+        valor: taxa._f_val,
+      }));
+
+      // Salvar as taxas de reserva
+      await salvarTaxasReserva(taxas);
+    }
+
+    console.log('Processamento de reservas concluído.');
+  } catch (error: any) {
+    console.error('Erro ao processar reservas:', error.message || error);
+  }
+}
+
+*/
+
+
+
+// Execução principal
+// (async () => {
+//  await processarReservas('2024-11-01', '2025-02-05', 0, 2);
+// })();
+
+/**
+ * Novo codigoo
+ */
 
 
 

@@ -89,18 +89,20 @@ model Condominio {
 }
 
 model TaxaReserva {
-  id          Int      @id @default(autoincrement())
-  reservaId   Int      // Relacionado à tabela Reserva
-  name        String   // Nome da taxa
-  valor       Float    // Valor da taxa
-  reserva     Reserva  @relation(fields: [reservaId], references: [id])
+  id                   Int      @id @default(autoincrement())
+  reservaId            Int      // Relacionado à tabela Reserva
+  name                 String   // Nome da taxa
+  valor                Float    // Valor da taxa
+  reserva              Reserva  @relation(fields: [reservaId], references: [id])
+  sincronizadoNoJestor Boolean  @default(false) // Indica sincronização com o Jestor
 
   @@unique([reservaId, name]) // Evita duplicação de taxas para a mesma reserva
 }
 
 model Canal {
-  id         Int      @id @default(autoincrement())
-  idExterno  String   @unique  // ID externo do canal (partner._id)
-  titulo     String   // Nome do canal (partner.name)
-  reservas   Reserva[] // Relação com reservas (1 Canal -> N Reservas)
+  id                   Int      @id @default(autoincrement())
+  idExterno            String   @unique  // ID externo do canal (partner._id)
+  titulo               String   // Nome do canal (partner.name)
+  reservas             Reserva[] // Relação com reservas (1 Canal -> N Reservas)
+  sincronizadoNoJestor Boolean  @default(false) // Indica sincronização com o Jestor
 }
