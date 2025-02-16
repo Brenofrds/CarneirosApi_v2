@@ -38,6 +38,13 @@ export async function atualizaCampoSincronizadoNoJestor(
                     data: {sincronizadoNoJestor: true},
                 });
                 break;
+            
+            case "condominio":
+                await prisma.condominio.update({
+                    where:{idExterno: id},
+                    data: {sincronizadoNoJestor: true},
+                });
+                break;    
 
             default:
                 throw new Error(`Tabela '${tabela}' não suportada.`);
@@ -45,7 +52,7 @@ export async function atualizaCampoSincronizadoNoJestor(
         
         console.log("--------------------------------------------------");
         console.log("Registro atualizado no banco de dados com sucesso!");
-        console.log("--------------------------------------------------");   
+        //console.log("--------------------------------------------------");   
     } catch (error: any){
         console.error(`Erro ao atualizar registro na '${tabela}':`, error.message);
     }
@@ -137,5 +144,27 @@ export async function getImoveisNaoSincronizados() {
     } 
     else {
         return imoveis;
+    }    
+}
+
+/**
+ * Busca todos os condominios que ainda não foram sincronizados com o Jestor.
+ */
+export async function getCondominiosNaoSincronizados() {
+    const condominios = await prisma.condominio.findMany({
+        where: {
+            sincronizadoNoJestor: false, // Filtra apenas os agentes não sincronizados
+        },
+    });
+    
+    // Verifica se existe registro para sincronizar
+    if(condominios.length === 0){
+        console.log("--------------------------------------------------");
+        console.log("Todos os condominios ja estao sincronizados!");
+        //console.log("--------------------------------------------------");
+        return false;
+    } 
+    else {
+        return condominios;
     }    
 }
