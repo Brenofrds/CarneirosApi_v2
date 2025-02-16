@@ -61,3 +61,12 @@ export interface typeImovel{
     //reservas: typeReserva | null;
     //sincronizadoNoJestor: boolean;
 }
+
+// Tipo para os atributos da tabela de condominio no banco de dados
+export interface typeCondominio{
+    id: number;
+    idExterno: string;
+    idStays: string;
+    sku: string;
+    regiao: string;
+}
