@@ -8,7 +8,7 @@ const JESTOR_TB_IMOVEL = 'oplicg48civ1tjt96g6e7';
 
 /**
  * Verifica se um imovel com o nome fornecido já existe na tabela do Jestor.
- * @param - Nome/CPF/ReservaId do imovel a ser verificado.
+ * @param - idExterno/SKU do imovel a ser verificado.
  * @returns - Um boolean indicando se o imovel já existe no Jestor.
  */
 
@@ -118,7 +118,8 @@ export async function sincronizarImovel() {
     }
 }
 
-/*funcao de teste*/
+/*funcao de teste
 (async () => {
   await sincronizarImovel();
 })();
+*/

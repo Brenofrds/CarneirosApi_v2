@@ -100,16 +100,16 @@ export async function sincronizarCondominio() {
                     await inserirCondominioNoJestor(condominio);
 
                     console.log("--------------------------------------------------");    
-                    console.log(`condominio: ${condominio.idExterno}\nSincronizado com sucesso!`);
+                    console.log(`Condominio: ${condominio.idExterno}\nSincronizado com sucesso!`);
                     //console.log("--------------------------------------------------");
                 } else {
 
                     console.log("--------------------------------------------------");
-                    console.log(`condominio: ${condominio.idExterno}\nJa existe no Jestor. Atualizado no banco local.`);
+                    console.log(`Condominio: ${condominio.idExterno}\nJa existe no Jestor. Atualizado no banco local.`);
                     //console.log("--------------------------------------------------");
                 }
                 // Atualiza o status no banco local para sincronizado
-                await atualizaCampoSincronizadoNoJestor('condominio', condominio.idExterno);
+                await atualizaCampoSincronizadoNoJestor('condominio', condominio.id);
             }
         }
     } catch (error: any) {
@@ -117,7 +117,8 @@ export async function sincronizarCondominio() {
     }
 }
 
-/*funcao de teste*/
+/*funcao de teste
 (async () => {
   await sincronizarCondominio();
 })();
+*/
