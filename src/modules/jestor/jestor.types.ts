@@ -48,4 +48,14 @@ export interface typeReserva {
     condominio: string;
     regiao: string;
     imovelOficialSku: string;
-  }
+}
+
+// Tipo para os atributos da tabela de hospede no banco de dados
+export interface typeCanal{
+    id: number;
+    idExterno: string;
+    titulo: string;
+}
+
+
+  

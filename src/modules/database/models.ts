@@ -32,6 +32,13 @@ export async function atualizaCampoSincronizadoNoJestor(
                 });
                 break;
 
+            case "canal":
+                await prisma.canal.update({
+                    where:{idExterno: id},
+                    data:{sincronizadoNoJestor: true},
+                });
+                break;
+
             default:
                 throw new Error(`Tabela '${tabela}' não suportada.`);
         }
@@ -108,6 +115,28 @@ export async function getReservasNaoSincronizados() {
     } 
     else {
         return reserva;
+    }    
+}
+
+/**
+ * Busca todos os agentes que ainda não foram sincronizados com o Jestor.
+ */
+export async function getCanaisNaoSincronizados() {
+    const canais = await prisma.canal.findMany({
+        where: {
+            sincronizadoNoJestor: false, // Filtra apenas os agentes não sincronizados
+        },
+    });
+    
+    // Verifica se existe registro para sincronizar
+    if(canais.length === 0){
+        console.log("--------------------------------------------------");
+        console.log("Todos os canais ja estao sincronizados!");
+        console.log("--------------------------------------------------");
+        return false;
+    } 
+    else {
+        return canais;
     }    
 }
 
