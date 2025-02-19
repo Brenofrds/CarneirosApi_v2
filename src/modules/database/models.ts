@@ -119,12 +119,12 @@ export async function getReservasNaoSincronizados() {
 }
 
 /**
- * Busca todos os agentes que ainda não foram sincronizados com o Jestor.
+ * Busca todos os canais que ainda não foram sincronizados com o Jestor.
  */
 export async function getCanaisNaoSincronizados() {
     const canais = await prisma.canal.findMany({
         where: {
-            sincronizadoNoJestor: false, // Filtra apenas os agentes não sincronizados
+            sincronizadoNoJestor: false, // Filtra apenas os canais não sincronizados
         },
     });
     
