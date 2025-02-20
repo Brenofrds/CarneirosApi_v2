@@ -1,4 +1,4 @@
-import { ReservaData, AgenteDetalhado, CanalDetalhado, TaxaReservaDetalhada } from '../stays.types';
+import { ReservaData, AgenteDetalhado, CanalDetalhado, TaxaReservaDetalhada, BloqueioDetalhado } from '../stays.types';
 
 export function transformReserva(reserva: any): ReservaData {
   const diarias = (new Date(reserva.checkOutDate).getTime() - new Date(reserva.checkInDate).getTime()) / (1000 * 60 * 60 * 24);
@@ -59,4 +59,18 @@ export function transformTaxasReserva(reserva: any, reservaId: number): TaxaRese
   }));
 
   return todasAsTaxas;
+}
+
+export function transformBloqueio(bloqueio: any): BloqueioDetalhado {
+  return {
+    _id: bloqueio._id, // ID externo único do bloqueio na Stays
+    name: bloqueio.id, // Nome ou identificador do bloqueio
+    checkIn: bloqueio.checkInDate.split('T')[0], // Data de check-in no formato YYYY-MM-DD
+    horaCheckIn: bloqueio.checkInTime ?? null, // Hora de check-in (se disponível)
+    checkOut: bloqueio.checkOutDate.split('T')[0], // Data de check-out no formato YYYY-MM-DD
+    horaCheckOut: bloqueio.checkOutTime ?? null, // Hora de check-out (se disponível)
+    notaInterna: bloqueio.internalNote ?? "Sem nota interna", // Nota associada ao bloqueio
+    idImovelStays: bloqueio._idlisting, // ID externo do imóvel na Stays associado ao bloqueio
+    imovelId: null, // Será preenchido posteriormente ao buscar no banco
+  };
 }

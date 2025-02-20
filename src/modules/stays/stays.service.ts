@@ -1,6 +1,6 @@
 import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado, fetchCondominioDetalhado, fetchReservaDetalhada } from './services/fetchService';
-import { transformReserva, transformAgente, transformCanal } from './services/transformService';
-import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva } from "./services/saveService";
+import { transformReserva, transformAgente, transformCanal, transformBloqueio } from './services/transformService';
+import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva, salvarProprietario, salvarBloqueio } from "./services/saveService";
 import prisma from "../../config/database"; // Importa o cliente Prisma
 
 
@@ -15,7 +15,15 @@ export const processWebhookData = async (body: any) => {
   switch (action) {
     case "reservation.created":
     case "reservation.modified":
-      return await processarReservaWebhook(payload); // Agora passamos o objeto inteiro
+      return payload.type === "blocked"
+        ? await processarBloqueioWebhook(payload)
+        : await processarReservaWebhook(payload);
+
+    case "reservation.canceled":
+      return await processarAtualizacaoStatus(payload, "Cancelada");
+
+    case "reservation.deleted":
+      return await processarAtualizacaoStatus(payload, "Deletada");
 
     default:
       throw new Error(`Ação desconhecida: ${action}`);
@@ -25,62 +33,115 @@ export const processWebhookData = async (body: any) => {
 
 const processarReservaWebhook = async (payload: any) => {
   try {
-    console.log(`📌 Processando webhook para reserva ${payload._id}`);
+    console.log(` Processando webhook para reserva ${payload._id}`);
 
-    // 🔹 Transformar os dados da reserva
+    // 🔹 Transformar os dados da reserva recebidos no formato correto para salvar
     const reservaData = transformReserva(payload);
     const agenteData = transformAgente(payload.agent);
     const canalData = transformCanal(payload.partner);
 
-    // 🔹 Criar/Atualizar Agente
-    let agenteSalvo = null;
+    // 🔹 Criar/Atualizar Agente e obter ID do banco
+    let agenteId: number | null = null;
     if (agenteData) {
-      agenteSalvo = await prisma.agente.upsert({
+      // Busca agente existente para comparar os dados
+      const agenteExistente = await prisma.agente.findUnique({
         where: { idExterno: agenteData._id },
-        update: { nome: agenteData.name },
-        create: { idExterno: agenteData._id, nome: agenteData.name, sincronizadoNoJestor: false },
+        select: { nome: true, sincronizadoNoJestor: true }
       });
+
+      // Verifica se precisa atualizar (se o nome for diferente)
+      const precisaAtualizar = !agenteExistente || agenteExistente.nome !== agenteData.name;
+
+      const agenteSalvo = await prisma.agente.upsert({
+        where: { idExterno: agenteData._id },
+        update: { 
+          nome: agenteData.name, 
+          sincronizadoNoJestor: precisaAtualizar ? false : agenteExistente?.sincronizadoNoJestor 
+        },
+        create: { 
+          idExterno: agenteData._id, 
+          nome: agenteData.name, 
+          sincronizadoNoJestor: false 
+        },
+        select: { id: true }, //  Retorna apenas o ID do banco
+      });
+      agenteId = agenteSalvo.id;
     }
 
-    // 🔹 Criar/Atualizar Canal
-    let canalSalvo = null;
+    // 🔹 Criar/Atualizar Canal e obter ID do banco
+    let canalId: number | null = null;
     if (canalData) {
-      canalSalvo = await prisma.canal.upsert({
+      // Busca canal existente para comparar os dados
+      const canalExistente = await prisma.canal.findUnique({
         where: { idExterno: canalData._id },
-        update: { titulo: canalData.titulo },
-        create: { idExterno: canalData._id, titulo: canalData.titulo },
+        select: { titulo: true, sincronizadoNoJestor: true }
       });
+
+      // Verifica se precisa atualizar (se o título for diferente)
+      const precisaAtualizar = !canalExistente || canalExistente.titulo !== canalData.titulo;
+
+      const canalSalvo = await prisma.canal.upsert({
+        where: { idExterno: canalData._id }, 
+        update: { 
+          titulo: canalData.titulo,
+          sincronizadoNoJestor: precisaAtualizar ? false : canalExistente?.sincronizadoNoJestor 
+        },
+        create: { 
+          idExterno: canalData._id, 
+          titulo: canalData.titulo, 
+          sincronizadoNoJestor: false 
+        },
+        select: { id: true }, //  Retorna apenas o ID do banco
+      });
+      canalId = canalSalvo.id;
     }
 
-    // 🔹 Buscar e salvar Imóvel
+    // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
     let imovelId = null;
+
     if (payload._idlisting) {
-      const imovelDetalhado = await fetchImovelDetalhado(payload._idlisting);
-      if (imovelDetalhado) {
-        const imovelSalvo = await salvarImovel(imovelDetalhado);
+      const { imovel, proprietario } = await fetchImovelDetalhado(payload._idlisting);
+
+      if (imovel) {
+        // 🔹 Salvar o imóvel no banco de dados
+        const imovelSalvo = await salvarImovel(imovel);
         imovelId = imovelSalvo.id;
 
-        // 🔹 Buscar e salvar Condomínio
-        if (imovelDetalhado._idproperty) {
-          const condominioDetalhado = await fetchCondominioDetalhado(imovelDetalhado._idproperty);
-          if (condominioDetalhado) {
-            await salvarCondominio(condominioDetalhado);
-          }
+        // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio em paralelo
+        if (imovel._idproperty) {
+          fetchCondominioDetalhado(imovel._idproperty).then(async (condominioDetalhado) => {
+            if (condominioDetalhado) {
+              await salvarCondominio(condominioDetalhado);
+            }
+          });
+        }
+
+        // 🔹 Se houver um proprietário, salvar no banco
+        if (proprietario) {
+          const proprietarioId = await salvarProprietario(proprietario.nome, proprietario.telefone);
+
+          // 🔹 Atualizar o imóvel para associar ao proprietário
+          await prisma.imovel.update({
+            where: { id: imovelId },
+            data: { proprietarioId },
+          });
         }
       }
     }
 
-    // 🔹 Atualiza a reserva com IDs dos relacionamentos
-    reservaData.imovelId = imovelId;
-    reservaData.agenteId = agenteSalvo?.idExterno ?? null;
-    reservaData.canalId = canalSalvo?.id ?? null;
 
-    const reservaSalva = await salvarReserva(
-      reservaData,
-      agenteSalvo ? { _id: agenteSalvo.idExterno, name: agenteSalvo.nome } : null,
-      canalSalvo ? { _id: canalSalvo.idExterno, titulo: canalSalvo.titulo || "" } : null // ✅ Agora sempre usando `idExterno`
-    );
-    
+    // 🔹 Atualiza a reserva com os IDs corretos
+    reservaData.imovelId = imovelId;
+    reservaData.agenteId = agenteId;
+    reservaData.canalId = canalId;
+
+    console.log("🔍 Dados transformados para salvar reserva:", reservaData);
+    console.log("🔍 Agente salvo ID:", agenteId);
+    console.log("🔍 Canal salvo ID:", canalId);
+
+    // 🔹 Salvar Reserva no banco com os IDs corretos
+    const reservaSalva = await salvarReserva(reservaData);
+
     // 🔹 Salva Hóspede (depois de salvar a reserva!)
     if (payload._idclient) {
       const hospedeDetalhado = await fetchHospedeDetalhado(payload._idclient);
@@ -105,333 +166,114 @@ const processarReservaWebhook = async (payload: any) => {
   }
 };
 
-
 /**
- * Processa as reservas, incluindo agentes, hóspedes, imóveis e condomínios.
- * @param fromDate - Data inicial no formato YYYY-MM-DD.
- * @param toDate - Data final no formato YYYY-MM-DD.
- * @param skip - Quantidade de registros a ignorar para paginação.
- * @param limit - Limite de registros a buscar.
+ * Processa notificações de bloqueios (reservation.created ou reservation.modified com type: "blocked").
+ * Essa função é chamada quando o webhook da Stays indica que uma reserva do tipo "blocked" foi criada ou modificada.
+ *
+ * @param payload - Objeto contendo os dados da reserva bloqueada recebidos do webhook da Stays.
  */
-/*
-export async function processarReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<void> {
+export const processarBloqueioWebhook = async (payload: any) => {
   try {
-    // Buscar apenas os IDs das reservas
-    const reservaIds = await fetchReservas(fromDate, toDate, skip, limit);
+    console.log(` Processando webhook para bloqueio ${payload._id}`);
 
-    for (const reservaId of reservaIds) {
-      // Obter os detalhes completos da reserva
-      const reservaDetalhada = await fetchReservaDetalhada(reservaId);
+    // 🔹 Transformar os dados do bloqueio para o formato correto
+    const bloqueioData = transformBloqueio(payload);
 
-      if (!reservaDetalhada) {
-        console.warn(`Detalhes da reserva ${reservaId} não encontrados.`);
-        continue;
-      }
+    // 🔹 Buscar e salvar Imóvel, Proprietário e Condomínio antes de registrar o bloqueio.
+    let imovelId: number | null = null;
 
-      // Transformar os dados da reserva
-      const reservaData = transformReserva(reservaDetalhada);
-      const agenteDetalhado = transformAgente(reservaDetalhada.agent);
-      const canalDetalhado = transformCanal(reservaDetalhada.partner);
-      const hospedeDetalhado = reservaDetalhada._idclient 
-        ? await fetchHospedeDetalhado(reservaDetalhada._idclient) 
-        : null;
+    if (payload._idlisting) {
+      // 🔍 Busca detalhes do imóvel e do proprietário na API da Stays
+      const { imovel, proprietario } = await fetchImovelDetalhado(payload._idlisting);
 
-      let imovelId: number | null = null;
-      if (reservaDetalhada._idlisting) {
-        // Buscar detalhes do imóvel
-        const imovelDetalhado = await fetchImovelDetalhado(reservaDetalhada._idlisting);
-        if (imovelDetalhado) {
-          // Salvar o imóvel e associar o ID
-          const imovelSalvo = await salvarImovel(imovelDetalhado);
-          imovelId = imovelSalvo.id;
+      if (imovel) {
+        // 🔹 Salvar o imóvel no banco de dados
+        const imovelSalvo = await salvarImovel(imovel);
+        imovelId = imovelSalvo.id;
+        bloqueioData.imovelId = imovelId; // Associa o imóvel ao bloqueio
 
-          // Buscar e salvar o condomínio relacionado, se aplicável
-          if (imovelDetalhado._idproperty) {
-            const condominioDetalhado = await fetchCondominioDetalhado(imovelDetalhado._idproperty);
+        // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio em paralelo
+        if (imovel._idproperty) {
+          fetchCondominioDetalhado(imovel._idproperty).then(async (condominioDetalhado) => {
             if (condominioDetalhado) {
               await salvarCondominio(condominioDetalhado);
             }
-          }
+          });
         }
+
+        // 🔹 Se houver um proprietário, salvar no banco
+        if (proprietario) {
+          const proprietarioId = await salvarProprietario(proprietario.nome, proprietario.telefone);
+
+          // 🔹 Atualizar o imóvel para associar ao proprietário
+          await prisma.imovel.update({
+            where: { id: imovelId },
+            data: { proprietarioId },
+          });
+        }
+      } else {
+        console.warn(` Imóvel ${payload._idlisting} não encontrado na API da Stays.`);
       }
-
-      // Atualizar o campo `imovelId` na reserva
-      reservaData.imovelId = imovelId;
-
-      // Salvar a reserva
-      const reservaSalva = await salvarReserva(reservaData, agenteDetalhado, canalDetalhado);
-
-      // Salvar o hóspede associado à reserva
-      if (hospedeDetalhado) {
-        await salvarHospede(hospedeDetalhado, reservaSalva.id);
-      }
-
-      // Consolidar as taxas de `hostingDetails` e `extrasDetails`
-      const taxas = [
-        ...(reservaDetalhada.price.hostingDetails?.fees || []),
-        ...(reservaDetalhada.price.extrasDetails?.fees || []),
-      ].map((taxa: { name: string; _f_val: number }) => ({
-        reservaId: reservaSalva.id, // Associar o ID da reserva
-        name: taxa.name?.trim() || 'Taxa Desconhecida', // Nome da taxa (ou um padrão)
-        valor: taxa._f_val,
-      }));
-
-      // Salvar as taxas de reserva
-      await salvarTaxasReserva(taxas);
     }
 
-    console.log('Processamento de reservas concluído.');
-  } catch (error: any) {
-    console.error('Erro ao processar reservas:', error.message || error);
+    // 🔹 Atualiza os dados do bloqueio com os IDs corretos
+    bloqueioData.imovelId = imovelId;
+
+    console.log("🔍 Dados transformados para salvar bloqueio:", bloqueioData);
+
+    // 🔹 Salvar Bloqueio no banco com os IDs corretos
+    const bloqueioSalvo = await salvarBloqueio(bloqueioData);
+
+    console.log(` Bloqueio salvo com sucesso: ${bloqueioSalvo.id}`);
+    return bloqueioSalvo;
+  } catch (error) {
+    console.error(" Erro ao processar bloqueio:", error);
+    throw new Error("Erro ao processar bloqueio.");
   }
-}
+};
 
-*/
-
-
-
-// Execução principal
-// (async () => {
-//  await processarReservas('2024-11-01', '2025-02-05', 0, 2);
-// })();
 
 /**
- * Novo codigoo
+ * Processa notificações de cancelamento de reservas (reservation.canceled)
+ * Essa função busca a reserva no banco e atualiza seu status para "Cancelada".
+ *
+ * @param payload - Objeto contendo os dados da reserva cancelada.
  */
-
-
-
-/**
-import staysClient from '../../config/staysClient';
-import prisma from '../../config/database';
-import { ReservaData, HospedeDetalhado, AgenteDetalhado } from './stays.types'; // Ajuste o caminho de importação conforme necessário
-
-/**
- * Busca os detalhes de um hóspede na API Stays.
- * @param clientId - ID do cliente/hóspede.
- * @returns Dados detalhados do hóspede ou null se não encontrado.
-
-export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDetalhado | null> {
+const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
   try {
-    const endpoint = `/booking/clients/${clientId}`;
-    const response = await staysClient.get(endpoint);
-    return response.data;
-  } catch (error: any) {
-    console.error(`Erro ao buscar detalhes do hóspede ${clientId}:`, error.response?.data || error.message);
-    return null;
-  }
-}
+    console.log(`📌 Processando atualização para ${novoStatus}: ${payload._id}`);
 
+    // 🔹 Busca no banco de dados se o `idExterno` pertence a uma reserva ou um bloqueio
+    const reservaExistente = await prisma.reserva.findUnique({ where: { idExterno: payload._id } });
+    const bloqueioExistente = await prisma.bloqueio.findUnique({ where: { idExterno: payload._id } });
 
- * Busca reservas na API Stays e retorna os dados transformados.
- * @param fromDate - Data de início no formato YYYY-MM-DD.
- * @param toDate - Data de fim no formato YYYY-MM-DD.
- * @param skip - Número de registros a pular (paginação).
- * @param limit - Limite de registros a buscar.
- * @returns Uma lista de objetos contendo os dados das reservas e seus hóspedes.
-
-export async function fetchReservas(
-  fromDate: string,
-  toDate: string,
-  skip: number,
-  limit: number
-): Promise<{ reserva: ReservaData; hospede: HospedeDetalhado | null; agente: AgenteDetalhado | null }[]> {
-  try {
-    const endpoint = `/booking/reservations?from=${fromDate}&to=${toDate}&dateType=arrival&skip=${skip}&limit=${limit}`;
-    const response = await staysClient.get(endpoint);
-    const reservas = response.data;
-
-    const resultados = [];
-
-    for (const reserva of reservas) {
-      const diarias = (new Date(reserva.checkOutDate).getTime() - new Date(reserva.checkInDate).getTime()) / (1000 * 60 * 60 * 24);
-      const pendenteQuitacao = reserva.price._f_total - (reserva.stats?._f_totalPaid || 0);
-
-      const agenteDetalhado: AgenteDetalhado | null = reserva.agent
-        ? {
-            _id: reserva.agent._id,
-            name: reserva.agent.name,
-          }
-        : null;
-
-      const reservaData: ReservaData = {
-        localizador: reserva.id,
-        idExterno: reserva._id,
-        dataDaCriacao: reserva.creationDate.split('T')[0], // Extrai somente a data
-        checkIn: reserva.checkInDate.split('T')[0],       // Extrai somente a data
-        horaCheckIn: reserva.checkInTime,                 // Usa somente a hora
-        checkOut: reserva.checkOutDate.split('T')[0],     // Extrai somente a data
-        horaCheckOut: reserva.checkOutTime, 
-        quantidadeHospedes: reserva.guests,
-        quantidadeAdultos: reserva.guestsDetails.adults,
-        quantidadeCriancas: reserva.guestsDetails.children,
-        quantidadeInfantil: reserva.guestsDetails.infants,
-        moeda: reserva.price.currency,
-        valorTotal: reserva.price._f_total,
-        totalPago: reserva.stats._f_totalPaid,
-        pendenteQuitacao: pendenteQuitacao,
-        totalTaxasExtras: reserva.price.extrasDetails._f_total || 0,
-        quantidadeDiarias: diarias,
-        partnerCode: reserva.partnerCode || null,
-        linkStays: reserva.reservationUrl,
-        idImovelStays: reserva._idlisting,
-        canaisTitulo: reserva.partner?.name || '',
-        agenteId: reserva.agent?._id || null,
-        origem: reserva.partner?.name || '',
-        status: reserva.type,
-        condominio: '', // Não disponível diretamente
-        regiao: '', // Não disponível diretamente
-        imovelOficialSku: '', // Não disponível diretamente
-      };
-
-      // Buscar detalhes do hóspede relacionado à reserva
-      let hospedeDetalhado: HospedeDetalhado | null = null;
-      if (reserva._idclient) {
-        hospedeDetalhado = await fetchHospedeDetalhado(reserva._idclient);
-      }
-
-      resultados.push({ reserva: reservaData, hospede: hospedeDetalhado, agente: agenteDetalhado });
+    if (!reservaExistente && !bloqueioExistente) {
+      console.warn(` Nenhuma reserva ou bloqueio encontrado para o ID ${payload._id}.`);
+      return null;
     }
 
-    return resultados;
-  } catch (error: any) {
-    console.error('Erro ao buscar reservas:', error.response?.data || error.message);
-    return [];
-  }
-}
-
-
- * Salva reservas e seus hóspedes relacionados no banco de dados.
- * 
- * @param dados - Lista de objetos contendo dados da reserva e do hóspede relacionado.
- */
-/**
- * Salva reservas, seus hóspedes relacionados e agentes no banco de dados.
- * 
- * @param dados - Lista de objetos contendo dados da reserva, do hóspede relacionado e do agente.
-
-export async function salvarReservasNoBanco(dados: { reserva: ReservaData; hospede: HospedeDetalhado | null; agente: AgenteDetalhado | null }[]): Promise<void> {
-  try {
-    for (const { reserva, hospede, agente } of dados) {
-      // Inserir ou atualizar o agente, se disponível
-      if (agente) {
-        await prisma.agente.upsert({
-          where: { idExterno: agente._id },
-          update: { nome: agente.name },
-          create: {
-            idExterno: agente._id,
-            nome: agente.name,
-            sincronizadoNoJestor: false,
-          },
-        });
-      }
-
-      // Inserir ou atualizar a reserva
-      const reservaSalva = await prisma.reserva.upsert({
-        where: { localizador: reserva.localizador },
-        update: {
-          idExterno: reserva.idExterno,
-          dataDaCriacao: reserva.dataDaCriacao,
-          checkIn: reserva.checkIn,
-          horaCheckIn: reserva.horaCheckIn,
-          checkOut: reserva.checkOut,
-          horaCheckOut: reserva.horaCheckOut,
-          quantidadeHospedes: reserva.quantidadeHospedes,
-          quantidadeAdultos: reserva.quantidadeAdultos,
-          quantidadeCriancas: reserva.quantidadeCriancas,
-          quantidadeInfantil: reserva.quantidadeInfantil,
-          moeda: reserva.moeda,
-          valorTotal: reserva.valorTotal,
-          totalPago: reserva.totalPago,
-          pendenteQuitacao: reserva.pendenteQuitacao,
-          totalTaxasExtras: reserva.totalTaxasExtras,
-          quantidadeDiarias: reserva.quantidadeDiarias,
-          partnerCode: reserva.partnerCode,
-          linkStays: reserva.linkStays,
-          idImovelStays: reserva.idImovelStays,
-          canaisTitulo: reserva.canaisTitulo,
-          agenteId: agente ? agente._id : null, // Relacionar com o ID do agente
-          origem: reserva.origem,
-          status: reserva.status,
-          condominio: reserva.condominio,
-          regiao: reserva.regiao,
-          imovelOficialSku: reserva.imovelOficialSku,
-        },
-        create: {
-          localizador: reserva.localizador,
-          idExterno: reserva.idExterno,
-          dataDaCriacao: reserva.dataDaCriacao,
-          checkIn: reserva.checkIn,
-          horaCheckIn: reserva.horaCheckIn,
-          checkOut: reserva.checkOut,
-          horaCheckOut: reserva.horaCheckOut,
-          quantidadeHospedes: reserva.quantidadeHospedes,
-          quantidadeAdultos: reserva.quantidadeAdultos,
-          quantidadeCriancas: reserva.quantidadeCriancas,
-          quantidadeInfantil: reserva.quantidadeInfantil,
-          moeda: reserva.moeda,
-          valorTotal: reserva.valorTotal,
-          totalPago: reserva.totalPago,
-          pendenteQuitacao: reserva.pendenteQuitacao,
-          totalTaxasExtras: reserva.totalTaxasExtras,
-          quantidadeDiarias: reserva.quantidadeDiarias,
-          partnerCode: reserva.partnerCode,
-          linkStays: reserva.linkStays,
-          idImovelStays: reserva.idImovelStays,
-          canaisTitulo: reserva.canaisTitulo,
-          agenteId: agente ? agente._id : null, // Relacionar com o ID do agente
-          origem: reserva.origem,
-          status: reserva.status,
-          condominio: reserva.condominio,
-          regiao: reserva.regiao,
-          imovelOficialSku: reserva.imovelOficialSku,
-        },
+    // 🔹 Se for reserva, atualiza o status
+    if (reservaExistente) {
+      const reservaAtualizada = await prisma.reserva.update({
+        where: { idExterno: payload._id },
+        data: { status: novoStatus, sincronizadoNoJestor: false },
       });
-
-      // Inserir ou atualizar o hóspede, se disponível
-      if (hospede) {
-        const telefone = hospede.phones?.[0]?.iso || null;
-        const cpf = hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || null;
-        const documento = hospede.documents?.find((doc) => doc.type === 'id')?.numb || null;
-
-        await prisma.hospede.upsert({
-          where: { idExterno: hospede._id },
-          update: {
-            nomeCompleto: hospede.name,
-            email: hospede.email,
-            dataDeNascimento: hospede.birthDate || null, // Salvar diretamente como string
-            nacionalidade: hospede.nationality || null,
-            fonte: hospede.clientSource,
-            telefone,
-            cpf,
-            documento,
-            reservaId: reservaSalva.id, // Relacionar com a reserva salva
-          },
-          create: {
-            idExterno: hospede._id,
-            nomeCompleto: hospede.name,
-            email: hospede.email,
-            dataDeNascimento: hospede.birthDate || null, // Salvar diretamente como string
-            nacionalidade: hospede.nationality || null,
-            fonte: hospede.clientSource,
-            telefone,
-            cpf,
-            documento,
-            reservaId: reservaSalva.id, // Relacionar com a reserva salva
-          },
-        });
-      }
+      console.log(` Reserva ${payload._id} atualizada para "${novoStatus}".`);
+      return reservaAtualizada;
     }
 
-    console.log('Dados salvos no banco de dados com sucesso.');
-  } catch (error: any) {
-    console.error('Erro ao salvar dados no banco de dados:', error.message);
+    // 🔹 Se for bloqueio, atualiza o status
+    if (bloqueioExistente) {
+      const bloqueioAtualizado = await prisma.bloqueio.update({
+        where: { idExterno: payload._id },
+        data: { notaInterna: `Status atualizado para ${novoStatus}`, sincronizadoNoJestor: false },
+      });
+      console.log(` Bloqueio ${payload._id} atualizado para "${novoStatus}".`);
+      return bloqueioAtualizado;
+    }
+  } catch (error) {
+    console.error(` Erro ao atualizar status para "${novoStatus}":`, error);
+    throw new Error(`Erro ao atualizar status para "${novoStatus}".`);
   }
-}
+};
 
-(async () => {
-  const reservas = await fetchReservas('2024-02-01', '2024-02-29', 0, 5);
-  await salvarReservasNoBanco(reservas);
-})()
-
-*/
