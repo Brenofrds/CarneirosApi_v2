@@ -1,4 +1,4 @@
-import { sincronizarProprietarios } from './proprietarios/proprietarios.service';
+import { sincronizarProprietarios } from './services/';
 import { sincronizarAgentes } from './agentes/agentes.service';
 
 export async function sincronizarTudo() {

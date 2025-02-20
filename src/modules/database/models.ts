@@ -8,7 +8,7 @@ import prisma from '../../config/database';
 export async function atualizaCampoSincronizadoNoJestor(
     tabela: string | number,
     id: string,
-    nome: string
+    nome?: string
 ) {
     try{
         switch(tabela){

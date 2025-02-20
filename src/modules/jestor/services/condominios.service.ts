@@ -109,7 +109,7 @@ export async function sincronizarCondominio() {
                     //console.log("--------------------------------------------------");
                 }
                 // Atualiza o status no banco local para sincronizado
-                await atualizaCampoSincronizadoNoJestor('condominio', condominio.id);
+                await atualizaCampoSincronizadoNoJestor('condominio', condominio.idExterno);
             }
         }
     } catch (error: any) {

@@ -1,4 +1,3 @@
-import { Decimal } from "@prisma/client/runtime/library";
 
 // Tipo para os atributos da tabela de agente no banco de dados
 export interface typeAgente {
