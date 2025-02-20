@@ -105,7 +105,8 @@ export async function sincronizarAgente() {
     }
 }
 
-/*funcao de teste*/
+/*funcao de teste
 (async () => {
   await sincronizarAgente();
 })();
+*/
