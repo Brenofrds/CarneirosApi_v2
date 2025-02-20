@@ -35,7 +35,7 @@ export async function verificarTaxaReservaNoJestor(
 
         // Garante que items está definido antes de verificar o tamanho
         const items = response.data?.data?.items;
-        /*
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
         console.log("--------------------------------------------------");
@@ -71,7 +71,7 @@ export async function inserirTaxaReservaNoJestor(taxaReserva: typeTaxaReserva) {
             object_type: JESTOR_TB_TAXARESERVA, // ID da tabela no Jestor
             data,
         });
-        /*
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('taxaReserva inserido no Jestor:\n\n', response.data);
         console.log("--------------------------------------------------");
@@ -97,19 +97,16 @@ export async function sincronizarTaxaReserva() {
        
                 if (!existeNoJestor) {
                     await inserirTaxaReservaNoJestor(taxaReserva);
-
                     console.log("--------------------------------------------------");    
                     console.log(`TaxaReserva: ${taxaReserva.id} ${taxaReserva.name}\nSincronizado com sucesso!`);
-                    //console.log("--------------------------------------------------");
-                } else {
 
+                } else {
                     console.log("--------------------------------------------------");
                     console.log(`TaxaReserva: ${taxaReserva.id} ${taxaReserva.name}\nJa existe no Jestor. Atualizado no banco local.`);
-                    //console.log("--------------------------------------------------");
+
                 }
                 // Atualiza o status no banco local para sincronizado
-                const idStr = taxaReserva.id.toString();
-                await atualizaCampoSincronizadoNoJestor('taxaReserva', idStr, taxaReserva.name);
+                await atualizaCampoSincronizadoNoJestor('taxaReserva', taxaReserva.id, taxaReserva.name);
             }
         }
     } catch (error: any) {
@@ -117,7 +114,8 @@ export async function sincronizarTaxaReserva() {
     }
 }
 
-/*funcao de teste*/
+/* funcao de teste
 (async () => {
   await sincronizarTaxaReserva();
 })();
+*/

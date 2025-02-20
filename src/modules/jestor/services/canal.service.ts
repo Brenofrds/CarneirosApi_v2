@@ -8,7 +8,7 @@ const JESTOR_TB_CANAL = '1gr5oeddpkkkxjula510g';
 
 /**
  * Verifica se um agente com o nome fornecido já existe na tabela do Jestor.
- * @param nome - Nome do agente a ser verificado.
+ * @param nome - IdExterno do agente a ser verificado.
  * @returns - Um boolean indicando se o agente já existe no Jestor.
  */
 
@@ -24,10 +24,11 @@ export async function verificarCanalNoJestor(nome: string) {
                 },
             ],
         });
-        
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
         console.log("--------------------------------------------------");
+        */
         // Garante que items está definido antes de verificar o tamanho
         const items = response.data?.data?.items;
 
@@ -61,10 +62,11 @@ export async function inserirCanalNoJestor(canal: typeCanal) {
             object_type: JESTOR_TB_CANAL, // ID da tabela no Jestor
             data,
         });
-
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('Canal inserido no Jestor:\n\n', response.data);
         console.log("--------------------------------------------------");
+        */
         return response.data; // Retorna o dado inserido
 
     } catch (error: any) {
@@ -86,14 +88,13 @@ export async function sincronizarCanal() {
 
                 if (!existeNoJestor) {
                     await inserirCanalNoJestor(canal);
-                    
                     console.log("--------------------------------------------------");
                     console.log(`Canal ${canal.idExterno}\nSincronizado com sucesso!`);
-                    console.log("--------------------------------------------------");
+                    
                 } else {
                     console.log("--------------------------------------------------");
                     console.log(`Canal: ${canal.idExterno}\nJa existe no Jestor. Atualizado no banco local.`);
-                    console.log("--------------------------------------------------");
+                    
                 }
                 // Atualiza o status no banco local para sincronizado
                 await atualizaCampoSincronizadoNoJestor('canal', canal.idExterno);
@@ -104,7 +105,8 @@ export async function sincronizarCanal() {
     }
 }
 
-/*funcao de teste*/
+/*funcao de teste
 (async () => {
   await sincronizarCanal();
 })();
+*/

@@ -32,10 +32,11 @@ export async function verificarReservaNoJestor(
                 },
             ],
         });
-        
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
         console.log("--------------------------------------------------");
+        */
         // Garante que items está definido antes de verificar o tamanho
         const items = response.data?.data?.items;
 
@@ -97,10 +98,11 @@ export async function inserirReservaNoJestor(reserva: typeReserva) {
             object_type: JESTOR_TB_RESERVA, // ID da tabela no Jestor
             data,
         });
-
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('Reserva inserida no Jestor:\n\n', response.data);
         console.log("--------------------------------------------------");
+        */
         return response.data; // Retorna o dado inserido
         
     } catch (error: any) {
@@ -122,14 +124,13 @@ export async function sincronizarReserva() {
        
                 if (!existeNoJestor) {
                     await inserirReservaNoJestor(reserva);
-
                     console.log("--------------------------------------------------");    
                     console.log(`Reserva: ${reserva.localizador}\nSincronizado com sucesso!`);
-                    console.log("--------------------------------------------------");
+
                 } else {
                     console.log("--------------------------------------------------");
                     console.log(`Reserva: ${reserva.localizador}\nJa existe no Jestor. Atualizado no banco local.`);
-                    console.log("--------------------------------------------------");
+
                 }
                 // Atualiza o status no banco local para sincronizado
                 await atualizaCampoSincronizadoNoJestor('reserva', reserva.localizador);
@@ -140,7 +141,8 @@ export async function sincronizarReserva() {
     }
 }
 
-// funcao de teste
+/* funcao de teste
 (async () => {
     await sincronizarReserva();
 })();
+*/

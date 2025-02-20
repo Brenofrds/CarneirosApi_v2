@@ -35,7 +35,7 @@ export async function verificarCondominioNoJestor(
 
         // Garante que items está definido antes de verificar o tamanho
         const items = response.data?.data?.items;
-        /*
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
         console.log("--------------------------------------------------");
@@ -72,7 +72,7 @@ export async function inserirCondominioNoJestor(condominio: typeCondominio) {
             object_type: JESTOR_TB_CONDOMINIO, // ID da tabela no Jestor
             data,
         });
-        /*
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('condominio inserido no Jestor:\n\n', response.data);
         console.log("--------------------------------------------------");
@@ -98,15 +98,13 @@ export async function sincronizarCondominio() {
        
                 if (!existeNoJestor) {
                     await inserirCondominioNoJestor(condominio);
-
                     console.log("--------------------------------------------------");    
                     console.log(`Condominio: ${condominio.idExterno}\nSincronizado com sucesso!`);
-                    //console.log("--------------------------------------------------");
+                    
                 } else {
-
                     console.log("--------------------------------------------------");
                     console.log(`Condominio: ${condominio.idExterno}\nJa existe no Jestor. Atualizado no banco local.`);
-                    //console.log("--------------------------------------------------");
+                    
                 }
                 // Atualiza o status no banco local para sincronizado
                 await atualizaCampoSincronizadoNoJestor('condominio', condominio.idExterno);
