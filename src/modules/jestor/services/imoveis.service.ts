@@ -118,8 +118,7 @@ export async function sincronizarImovel() {
     }
 }
 
-/*funcao de teste
+//funcao de teste
 (async () => {
   await sincronizarImovel();
 })();
-*/
