@@ -52,31 +52,34 @@ model Reserva {
   partnerCode          String?
   linkStays            String
   idImovelStays        String
-  agenteId             String?
   origem               String
   status               String
   condominio           String
   regiao               String
   imovelOficialSku     String
   hospedes             Hospede[] // Relação com a tabela Hospede
-  imovelId             Int?      // Tornar opcional
+  imovelId             Int?      
   imovel               Imovel?   @relation(fields: [imovelId], references: [id]) // Relação opcional com Imovel
-  agente               Agente?   @relation(fields: [agenteId], references: [idExterno])
+  agenteId             Int?      
+  agente               Agente?   @relation(fields: [agenteId], references: [id]) // Relação com Agente
+  canalId              Int?      
+  canal                Canal?    @relation(fields: [canalId], references: [id]) // Relação com Canal
   taxasReserva         TaxaReserva[] // Relação com a tabela TaxaReserva
-  canalId              Int? // Relacionamento com o canal
-  canal                Canal? @relation(fields: [canalId], references: [id]) // Relação opcional com Canal
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
 }
 
 model Imovel {
-  id                   Int       @id @default(autoincrement())
-  idExterno            String    @unique // ID externo (_id) do imóvel na Stays
-  idStays              String    @unique // ID interno (id) do imóvel na Stays
-  sku                  String?   // Nome interno ou SKU do imóvel (internalName)
-  status               String    // Status do imóvel (ex.: hidden, active)
-  idCondominioStays    String?   // ID externo do condomínio relacionado
-  reservas             Reserva[] // Relação com a tabela Reserva (1 Imóvel -> N Reservas)
-  sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
+  id                   Int        @id @default(autoincrement())
+  idExterno            String     @unique // ID externo (_id) do imóvel na Stays
+  idStays              String     @unique // ID interno (id) do imóvel na Stays
+  sku                  String?    // Nome interno ou SKU do imóvel (internalName)
+  status               String     // Status do imóvel (ex.: hidden, active)
+  idCondominioStays    String?    // ID externo do condomínio relacionado
+  reservas             Reserva[]  // Relação com a tabela Reserva (1 Imóvel -> N Reservas)
+  proprietarioId       Int?       
+  proprietario         Proprietario? @relation(fields: [proprietarioId], references: [id]) // Relação opcional com Proprietario
+  bloqueios            Bloqueio[] // ✅ Adicionado: Relação com a tabela Bloqueio
+  sincronizadoNoJestor Boolean    @default(false) // Controle de sincronização com o Jestor
 }
 
 model Condominio {
@@ -105,4 +108,30 @@ model Canal {
   titulo               String   // Nome do canal (partner.name)
   reservas             Reserva[] // Relação com reservas (1 Canal -> N Reservas)
   sincronizadoNoJestor Boolean  @default(false) // Indica sincronização com o Jestor
+}
+
+model Proprietario {
+  id                   Int       @id @default(autoincrement())
+  nome                 String    // Nome do proprietário
+  telefone             String?   // Telefone principal do proprietário
+  imoveis              Imovel[]  // Relação com os imóveis associados ao proprietário
+  sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
+
+  @@unique([nome, telefone]) // Evita duplicação de proprietários com o mesmo nome e telefone
+}
+
+model Bloqueio {
+  id                   Int       @id @default(autoincrement()) 
+  idExterno            String    @unique // ID externo (_id) do bloqueio na Stays
+  localizador          String    @unique // Identificador do bloqueio
+  checkIn              String    // Data de check-in do bloqueio
+  checkOut             String    // Data de check-out do bloqueio
+  horaCheckIn          String?   // Hora de check-in
+  horaCheckOut         String?   // Hora de check-out
+  notaInterna          String?   // Nota interna associada ao bloqueio
+  imovelId             Int?      // Permite `null` se o imóvel não for encontrado
+  imovel               Imovel?   @relation(fields: [imovelId], references: [id]) // Relacionado a um imóvel específico
+  sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
+
+  @@unique([idExterno, imovelId]) // Garante que o mesmo bloqueio não seja cadastrado duas vezes para o mesmo imóvel
 }

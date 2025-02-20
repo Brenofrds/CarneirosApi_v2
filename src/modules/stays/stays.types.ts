@@ -33,7 +33,7 @@ export interface ReservaData {
   idImovelStays: string; // ID do imóvel na Stays
   imovelId: number | null; // ID do imóvel relacionado no banco de dados
   canalId: number | null; // ID do canal relacionado no banco de dados
-  agenteId: string | null;
+  agenteId: number | null;
   origem: string; // Mantendo origem da reserva
   status: string;
   condominio: string;
@@ -47,13 +47,13 @@ export interface AgenteDetalhado {
   name: string; // Nome do agente
 }
 
-// Tipo para os detalhes do imóvel obtidos na API Stays
 export interface ImovelDetalhado {
   _id: string;         // ID externo do imóvel na Stays
   id: string;          // ID interno na Stays
   internalName: string; // Nome interno ou SKU do imóvel
   status: string;       // Status do imóvel (ex.: hidden, active)
   _idproperty?: string; // ID externo do condomínio relacionado
+  owner?: ProprietarioDetalhado; // Proprietário do imóvel (pode ser opcional)
 }
 
 // Tipo para os detalhes do condomínio obtidos na API Stays
@@ -75,4 +75,23 @@ export interface TaxaReservaDetalhada {
 export interface CanalDetalhado {
   _id: string;   // ID externo do canal (partner._id)
   titulo: string; // Nome do canal (partner.name)
+}
+
+// Tipo para os detalhes do proprietário obtidos na API Stays
+export interface ProprietarioDetalhado {
+  nome: string; // Nome do proprietário
+  telefone?: string; // Telefone do proprietário (se disponível)
+}
+
+// Tipo para os detalhes do bloqueio obtidos na API Stays
+export interface BloqueioDetalhado {
+  _id: string;            // ID externo do bloqueio na Stays
+  name: string;           // Nome do bloqueio (pode ser o identificador)
+  checkIn: string;        // Data de check-in no formato YYYY-MM-DD
+  horaCheckIn?: string;   // Hora de check-in no formato HH:mm (se disponível)
+  checkOut: string;       // Data de check-out no formato YYYY-MM-DD
+  horaCheckOut?: string;  // Hora de check-out no formato HH:mm (se disponível)
+  notaInterna?: string;   // Nota interna associada ao bloqueio
+  idImovelStays: string;  // ID externo do imóvel na Stays associado ao bloqueio
+  imovelId?: number | null; // ID do imóvel relacionado no banco de dados (se já cadastrado)
 }

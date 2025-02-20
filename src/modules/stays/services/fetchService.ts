@@ -1,5 +1,5 @@
 import staysClient from '../../../config/staysClient';
-import { HospedeDetalhado, ReservaData, AgenteDetalhado, ImovelDetalhado, CondominioDetalhado, CanalDetalhado } from '../stays.types';
+import { HospedeDetalhado, ReservaData, AgenteDetalhado, ImovelDetalhado, CondominioDetalhado, CanalDetalhado, ProprietarioDetalhado, BloqueioDetalhado } from '../stays.types';
 
 export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDetalhado | null> {
   try {
@@ -68,14 +68,14 @@ export async function fetchReservaDetalhada(reservationId: string): Promise<any>
   }
 }
 
-// Função para buscar os detalhes do imóvel usando o listingId
-export async function fetchImovelDetalhado(listingId: string): Promise<ImovelDetalhado | null> {
+// Função para buscar os detalhes do imóvel e do proprietário usando o listingId
+export async function fetchImovelDetalhado(listingId: string): Promise<{ imovel: ImovelDetalhado | null; proprietario: ProprietarioDetalhado | null }> {
   try {
     const endpoint = `/content/listings/${listingId}`;
     const response = await staysClient.get(endpoint);
     const data = response.data;
 
-    // Extrair apenas os campos necessários
+    // Extrair apenas os campos necessários do imóvel
     const imovelDetalhado: ImovelDetalhado = {
       _id: data._id, // ID externo do imóvel na Stays
       id: data.id, // ID interno do imóvel na Stays
@@ -84,10 +84,18 @@ export async function fetchImovelDetalhado(listingId: string): Promise<ImovelDet
       _idproperty: data._idproperty, // ID externo do condomínio relacionado
     };
 
-    return imovelDetalhado;
+    // 🔹 Extrair dados do proprietário (se existirem na resposta)
+    const proprietarioDetalhado: ProprietarioDetalhado | null = data.owner
+      ? {
+          nome: data.owner.name,
+          telefone: data.owner.phones?.[0]?.iso || null, // Pega o primeiro telefone se existir
+        }
+      : null;
+
+    return { imovel: imovelDetalhado, proprietario: proprietarioDetalhado };
   } catch (error: any) {
     console.error(`Erro ao buscar detalhes do imóvel ${listingId}:`, error.response?.data || error.message);
-    return null;
+    return { imovel: null, proprietario: null };
   }
 }
 
