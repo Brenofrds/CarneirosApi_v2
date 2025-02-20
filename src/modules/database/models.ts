@@ -7,7 +7,8 @@ import prisma from '../../config/database';
  */
 export async function atualizaCampoSincronizadoNoJestor(
     tabela: string | number,
-    id: string
+    id: string,
+    nome: string
 ) {
     try{
         switch(tabela){
@@ -31,6 +32,30 @@ export async function atualizaCampoSincronizadoNoJestor(
                     data: {sincronizadoNoJestor: true},
                 });
                 break;
+            
+            case "imovel":
+                await prisma.imovel.update({
+                    where:{idExterno: id},
+                    data: {sincronizadoNoJestor: true},
+                });
+                break;
+            
+            case "condominio":
+                await prisma.condominio.update({
+                    where:{idExterno: id},
+                    data: {sincronizadoNoJestor: true},
+                });
+                break;
+            case "taxaReserva":
+                const idStr = parseInt(id);// transforma id em string
+                await prisma.taxaReserva.update({
+                    where:{
+                            id: idStr,
+                            name: nome,
+                        },
+                    data: {sincronizadoNoJestor: true},
+                });
+                break;    
 
             default:
                 throw new Error(`Tabela '${tabela}' não suportada.`);
@@ -38,7 +63,7 @@ export async function atualizaCampoSincronizadoNoJestor(
         
         console.log("--------------------------------------------------");
         console.log("Registro atualizado no banco de dados com sucesso!");
-        console.log("--------------------------------------------------");   
+        //console.log("--------------------------------------------------");   
     } catch (error: any){
         console.error(`Erro ao atualizar registro na '${tabela}':`, error.message);
     }
@@ -59,7 +84,7 @@ export async function getAgentesNaoSincronizados() {
     if(agentes.length === 0){
         console.log("--------------------------------------------------");
         console.log("Todos os agentes ja estao sincronizados!");
-        console.log("--------------------------------------------------");
+        //console.log("--------------------------------------------------");
         return false;
     } 
     else {
@@ -81,7 +106,7 @@ export async function getHospedesNaoSincronizados() {
     if(hospede.length === 0){
         console.log("--------------------------------------------------");
         console.log("Todos os hospedes ja estao sincronizados!");
-        console.log("--------------------------------------------------");
+        //console.log("--------------------------------------------------");
         return false;
     } 
     else {
@@ -103,7 +128,7 @@ export async function getReservasNaoSincronizados() {
     if(reserva.length === 0){
         console.log("--------------------------------------------------");
         console.log("Todos as reservas ja estao sincronizados!");
-        console.log("--------------------------------------------------");
+        //console.log("--------------------------------------------------");
         return false;
     } 
     else {
@@ -111,5 +136,68 @@ export async function getReservasNaoSincronizados() {
     }    
 }
 
+/**
+ * Busca todos os imoveis que ainda não foram sincronizados com o Jestor.
+ */
+export async function getImoveisNaoSincronizados() {
+    const imoveis = await prisma.imovel.findMany({
+        where: {
+            sincronizadoNoJestor: false, // Filtra apenas os agentes não sincronizados
+        },
+    });
+    
+    // Verifica se existe registro para sincronizar
+    if(imoveis.length === 0){
+        console.log("--------------------------------------------------");
+        console.log("Todos os imoveis ja estao sincronizados!");
+        //console.log("--------------------------------------------------");
+        return false;
+    } 
+    else {
+        return imoveis;
+    }    
+}
 
-  
+/**
+ * Busca todos os condominios que ainda não foram sincronizados com o Jestor.
+ */
+export async function getCondominiosNaoSincronizados() {
+    const condominios = await prisma.condominio.findMany({
+        where: {
+            sincronizadoNoJestor: false, // Filtra apenas os agentes não sincronizados
+        },
+    });
+    
+    // Verifica se existe registro para sincronizar
+    if(condominios.length === 0){
+        console.log("--------------------------------------------------");
+        console.log("Todos os condominios ja estao sincronizados!");
+        //console.log("--------------------------------------------------");
+        return false;
+    } 
+    else {
+        return condominios;
+    }    
+}
+
+/**
+ * Busca todos as taxasReservas que ainda não foram sincronizados com o Jestor.
+ */
+export async function getTaxasReservasNaoSincronizados() {
+    const taxasReservas = await prisma.taxaReserva.findMany({
+        where: {
+            sincronizadoNoJestor: false, // Filtra apenas as taxasReservas não sincronizados
+        },
+    });
+    
+    // Verifica se existe registro para sincronizar
+    if(taxasReservas.length === 0){
+        console.log("--------------------------------------------------");
+        console.log("Todos as taxasReservas ja estao sincronizados!");
+        //console.log("--------------------------------------------------");
+        return false;
+    } 
+    else {
+        return taxasReservas;
+    }    
+}

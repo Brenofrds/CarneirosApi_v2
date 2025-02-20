@@ -1,3 +1,5 @@
+import { Decimal } from "@prisma/client/runtime/library";
+
 // Tipo para os atributos da tabela de agente no banco de dados
 export interface typeAgente {
     id: number;
@@ -49,3 +51,32 @@ export interface typeReserva {
     regiao: string;
     imovelOficialSku: string;
   }
+
+// Tipo para os atributos da tabela de imovel no banco de dados
+export interface typeImovel{
+    id: number;
+    idExterno: string;
+    idStays: string;
+    sku: string | null;
+    status: string;
+    idCondominioStays: string | null;
+    //reservas: typeReserva | null;
+    //sincronizadoNoJestor: boolean;
+}
+
+// Tipo para os atributos da tabela de condominio no banco de dados
+export interface typeCondominio{
+    id: number;
+    idExterno: string;
+    idStays: string;
+    sku: string;
+    regiao: string;
+}
+
+// Tipo para os atributos da tabela de taxaReserva no banco de dados
+export interface typeTaxaReserva{
+    id: number;
+    reservaId: number;
+    name: string;
+    valor: number;
+}
