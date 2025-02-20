@@ -35,7 +35,7 @@ export async function verificarImovelNoJestor(
 
         // Garante que items está definido antes de verificar o tamanho
         const items = response.data?.data?.items;
-        /*
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
         console.log("--------------------------------------------------");
@@ -73,7 +73,7 @@ export async function inserirImovelNoJestor(imovel: typeImovel) {
             object_type: JESTOR_TB_IMOVEL, // ID da tabela no Jestor
             data,
         });
-        /*
+        /* para depuracao
         console.log("--------------------------------------------------");
         console.log('Imovel inserido no Jestor:\n\n', response.data);
         console.log("--------------------------------------------------");
@@ -99,15 +99,13 @@ export async function sincronizarImovel() {
        
                 if (!existeNoJestor) {
                     await inserirImovelNoJestor(imovel);
-
                     console.log("--------------------------------------------------");    
                     console.log(`Imovel: ${imovel.idExterno}\nSincronizado com sucesso!`);
-                    //console.log("--------------------------------------------------");
+                    
                 } else {
-
                     console.log("--------------------------------------------------");
                     console.log(`Imovel: ${imovel.idExterno}\nJa existe no Jestor. Atualizado no banco local.`);
-                    //console.log("--------------------------------------------------");
+                    
                 }
                 // Atualiza o status no banco local para sincronizado
                 await atualizaCampoSincronizadoNoJestor('imovel', imovel.idExterno);
@@ -118,7 +116,8 @@ export async function sincronizarImovel() {
     }
 }
 
-//funcao de teste
+/*funcao de teste
 (async () => {
   await sincronizarImovel();
 })();
+*/
