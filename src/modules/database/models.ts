@@ -57,6 +57,13 @@ export async function atualizaCampoSincronizadoNoJestor(
                 });
                 break;    
 
+            case "canal":
+                await prisma.canal.update({
+                    where:{idExterno: id},
+                    data:{sincronizadoNoJestor: true},
+                });
+                break;
+
             default:
                 throw new Error(`Tabela '${tabela}' não suportada.`);
         }
@@ -137,26 +144,43 @@ export async function getReservasNaoSincronizados() {
 }
 
 /**
- * Busca todos os imoveis que ainda não foram sincronizados com o Jestor.
+ * Busca todos os canais que ainda não foram sincronizados com o Jestor.
+ */
+export async function getCanaisNaoSincronizados() {
+    const canais = await prisma.canal.findMany({
+        where: {
+            sincronizadoNoJestor: false, // Filtra apenas os canais não sincronizados
+        },
+    });
+
+    // Verifica se existe registro para sincronizar
+    if (canais.length === 0) {
+        console.log("--------------------------------------------------");
+        console.log("Todos os canais já estão sincronizados!");
+        return false;
+    } 
+    return canais;
+}
+
+/**
+ * Busca todos os imóveis que ainda não foram sincronizados com o Jestor.
  */
 export async function getImoveisNaoSincronizados() {
     const imoveis = await prisma.imovel.findMany({
         where: {
-            sincronizadoNoJestor: false, // Filtra apenas os agentes não sincronizados
+            sincronizadoNoJestor: false, // Filtra apenas os imóveis não sincronizados
         },
     });
-    
+
     // Verifica se existe registro para sincronizar
-    if(imoveis.length === 0){
+    if (imoveis.length === 0) {
         console.log("--------------------------------------------------");
-        console.log("Todos os imoveis ja estao sincronizados!");
-        //console.log("--------------------------------------------------");
+        console.log("Todos os imóveis já estão sincronizados!");
         return false;
     } 
-    else {
-        return imoveis;
-    }    
+    return imoveis;
 }
+
 
 /**
  * Busca todos os condominios que ainda não foram sincronizados com o Jestor.

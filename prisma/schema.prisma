@@ -104,5 +104,5 @@ model Canal {
   idExterno            String   @unique  // ID externo do canal (partner._id)
   titulo               String   // Nome do canal (partner.name)
   reservas             Reserva[] // Relação com reservas (1 Canal -> N Reservas)
-  sincronizadoNoJestor Boolean  @default(false) // Indica sincronização com o Jestor
+  sincronizadoNoJestor Boolean  @default(false) // Controle de sincronização com o Jestor
 }

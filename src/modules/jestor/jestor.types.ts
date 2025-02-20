@@ -50,22 +50,27 @@ export interface typeReserva {
     condominio: string;
     regiao: string;
     imovelOficialSku: string;
-  }
+}
 
-// Tipo para os atributos da tabela de imovel no banco de dados
-export interface typeImovel{
+// Tipo para os atributos da tabela de canal no banco de dados
+export interface typeCanal {
+    id: number;
+    idExterno: string;
+    titulo: string;
+}
+
+// Tipo para os atributos da tabela de imóvel no banco de dados
+export interface typeImovel {
     id: number;
     idExterno: string;
     idStays: string;
     sku: string | null;
     status: string;
     idCondominioStays: string | null;
-    //reservas: typeReserva | null;
-    //sincronizadoNoJestor: boolean;
 }
 
-// Tipo para os atributos da tabela de condominio no banco de dados
-export interface typeCondominio{
+// Tipo para os atributos da tabela de condomínio no banco de dados
+export interface typeCondominio {
     id: number;
     idExterno: string;
     idStays: string;
@@ -74,7 +79,7 @@ export interface typeCondominio{
 }
 
 // Tipo para os atributos da tabela de taxaReserva no banco de dados
-export interface typeTaxaReserva{
+export interface typeTaxaReserva {
     id: number;
     reservaId: number;
     name: string;
