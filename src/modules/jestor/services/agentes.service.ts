@@ -1,4 +1,4 @@
-    import jestorClient from '../../../config/jestorClient';
+import jestorClient from '../../../config/jestorClient';
 import { typeAgente } from '../jestor.types';
 import { atualizaCampoSincronizadoNoJestor, getAgentesNaoSincronizados } from '../../database/models';
 
