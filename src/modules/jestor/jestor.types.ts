@@ -98,3 +98,9 @@ export interface typeBloqueio {
     imovelId: number | null;
 }
 
+// Tipo para os atributos da tabela de proprietario no banco de dados
+export interface typeProprietario {
+    id: number;
+    nome: string;
+    telefone: string | null;
+}
