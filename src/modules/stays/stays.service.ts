@@ -25,6 +25,10 @@ export const processWebhookData = async (body: any) => {
     case "reservation.deleted":
       return await processarAtualizacaoStatus(payload, "Deletada");
 
+    case "listing.modified":
+    case "listing.created":
+      return await processarListingWebhook(payload);
+
     default:
       throw new Error(`Ação desconhecida: ${action}`);
   }
@@ -241,7 +245,7 @@ export const processarBloqueioWebhook = async (payload: any) => {
  */
 const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
   try {
-    console.log(`📌 Processando atualização para ${novoStatus}: ${payload._id}`);
+    console.log(` Processando atualização para ${novoStatus}: ${payload._id}`);
 
     // 🔹 Busca no banco de dados se o `idExterno` pertence a uma reserva ou um bloqueio
     const reservaExistente = await prisma.reserva.findUnique({ where: { idExterno: payload._id } });
@@ -277,3 +281,60 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
   }
 };
 
+/**
+ * Processa notificações de criação ou modificação de listagens de imóveis.
+ *
+ * @param payload - Objeto contendo os dados da listagem recebidos do webhook da Stays.
+ */
+export const processarListingWebhook = async (payload: any) => {
+  try {
+    console.log(` Processando webhook para imóvel ${payload._id}`);
+
+    // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
+    let imovelId: number | null = null;
+
+    if (payload._id) {
+      // 🔹 Busca detalhes do imóvel e do proprietário na API da Stays
+      const { imovel, proprietario } = await fetchImovelDetalhado(payload._id);
+
+      if (imovel) {
+        // 🔹 Salvar o imóvel no banco de dados
+        const imovelSalvo = await salvarImovel(imovel);
+        imovelId = imovelSalvo.id;
+
+        console.log(` Imóvel salvo/atualizado: ${imovelSalvo.idExterno} (ID Interno: ${imovelId})`);
+
+        // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio em paralelo
+        if (imovel._idproperty) {
+          fetchCondominioDetalhado(imovel._idproperty).then(async (condominioDetalhado) => {
+            if (condominioDetalhado) {
+              await salvarCondominio(condominioDetalhado);
+            }
+          });
+        }
+
+        // 🔹 Se houver um proprietário, salvar no banco
+        if (proprietario) {
+          const proprietarioId = await salvarProprietario(proprietario.nome, proprietario.telefone);
+
+          // 🔹 Atualizar o imóvel para associá-lo ao proprietário
+          await prisma.imovel.update({
+            where: { id: imovelId },
+            data: { proprietarioId },
+          });
+
+          console.log(` Proprietário salvo/atualizado e vinculado ao imóvel: ${proprietario.nome}`);
+        }
+      } else {
+        console.warn(` Imóvel ${payload._id} não encontrado na API da Stays.`);
+      }
+    }
+
+    console.log(` Processamento concluído para imóvel ${payload._id}`);
+    return imovelId;
+
+  } catch (error) {
+    console.error(" Erro ao processar listagem de imóvel:", error);
+    throw new Error("Erro ao processar listagem de imóvel.");
+  }
+};
