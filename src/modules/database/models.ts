@@ -63,6 +63,13 @@ export async function atualizaCampoSincronizadoNoJestor(
                     data:{sincronizadoNoJestor: true},
                 });
                 break;
+                
+            case "bloqueio":
+                await prisma.bloqueio.update({
+                    where:{idExterno: id},
+                    data:{sincronizadoNoJestor: true},
+                    });
+                break;
 
             default:
                 throw new Error(`Tabela '${tabela}' não suportada.`);
@@ -223,5 +230,27 @@ export async function getTaxasReservasNaoSincronizados() {
     } 
     else {
         return taxasReservas;
+    }    
+}
+
+/**
+ * Busca todos as bloqueios que ainda não foram sincronizados com o Jestor.
+ */
+export async function getBloqueiosNaoSincronizados() {
+    const bloqueios = await prisma.bloqueio.findMany({
+        where: {
+            sincronizadoNoJestor: false, // Filtra apenas as taxasReservas não sincronizados
+        },
+    });
+    
+    // Verifica se existe registro para sincronizar
+    if(bloqueios.length === 0){
+        console.log("--------------------------------------------------");
+        console.log("Todos as taxasReservas ja estao sincronizados!");
+        //console.log("--------------------------------------------------");
+        return false;
+    } 
+    else {
+        return bloqueios;
     }    
 }

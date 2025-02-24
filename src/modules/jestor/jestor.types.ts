@@ -84,3 +84,17 @@ export interface typeTaxaReserva {
     name: string;
     valor: number;
 }
+
+// Tipo para os atributos da tabela de bloqueio no banco de dados
+export interface typeBloqueio {
+    id: number;
+    idExterno: string;
+    localizador: string;
+    checkIn: string;
+    checkOut: string;
+    horaCheckIn: string | null;
+    horaCheckOut: string | null;
+    notaInterna: string | null;
+    imovelId: number | null;
+}
+
