@@ -1,119 +1,141 @@
 import jestorClient from '../../../config/jestorClient';
 import { typeProprietario } from '../jestor.types'; 
-import { atualizaCampoSincronizadoNoJestor, getProprietariosNaoSincronizados } from '../../database/models';
+import { atualizaCampoSincronizadoNoJestor } from '../../database/models';
+import { registrarErroJestor } from '../../database/erro.service';
+import prisma from '../../../config/database';
+import { logDebug } from '../../../utils/logger';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
+const ENDPOINT_UPDATE = '/object/update';
 const JESTOR_TB_PROPRIETARIO = 'yhe66m7287os9_0xq_kbu';
 
 /**
- * Verifica se um proprietario com o nome e telefone fornecido já existe na tabela do Jestor.
- * @param - Nome/Telefone do proprietario a ser verificado.
- * @returns - Um boolean indicando se o proprietario já existe no Jestor.
+ * Consulta o Jestor para verificar se o proprietário existe e, se sim, retorna o ID interno.
+ * 
+ * @param nome - Nome do proprietário.
+ * @param telefone - Telefone do proprietário.
+ * @returns - O ID interno do Jestor ou null se o proprietário não existir.
  */
-
-export async function verificarProprietarioNoJestor(
-    nome: string, 
-    telefone: string | null
-) {
+export async function obterIdInternoProprietarioNoJestor(nome: string, telefone: string | null) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_TB_PROPRIETARIO, // ID da tabela no Jestor
+            object_type: JESTOR_TB_PROPRIETARIO,
             filters: [
-                        {
-                            field: 'nome_1', // Nome do campo no Jestor
-                            value: nome,
-                            operator: '==', // Operador para comparação
-                        },
-                        {
-                            field: 'telefone',
-                            value: telefone,
-                            operator: '==',
-                        },
-                    ],
+                { field: 'nome_1', value: nome, operator: '==' },
+                { field: 'telefone', value: telefone, operator: '==' },
+            ],
         });
 
-        // Garante que items está definido antes de verificar o tamanho
         const items = response.data?.data?.items;
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
-        console.log("--------------------------------------------------");
-        */
+
         if (Array.isArray(items) && items.length > 0) {
-            return true; // proprietario existe
+            const idInterno = items[0][`id_${JESTOR_TB_PROPRIETARIO}`];
+            return idInterno ?? null;
         }
 
-        return false; // proprietario não existe
+        return null;
+
     } catch (error: any) {
-        console.error('Erro ao verificar proprietario no Jestor:', error.message);
-        throw new Error('Erro ao verificar proprietario no Jestor');
+        const errorMessage = error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao buscar proprietário no Jestor: ${errorMessage}`);
+        throw new Error('Erro ao buscar proprietário no Jestor');
     }
 }
 
 /**
- * Insere um proprietario no Jestor.
- * @param proprietario - Dados do proprietario a serem inseridos.
+ * Insere um proprietário no Jestor.
+ * @param proprietario - Dados do proprietário a serem inseridos.
  */
 export async function inserirProprietarioNoJestor(proprietario: typeProprietario) {
- 
     try {
-        // nome do campo no Jestor | nome do campo no banco de dados local
-        const data: any = {
-            idapi: proprietario.id, // ID do banco da API EngNet
+        const data: Record<string, any> = {
+            idapi: proprietario.id,
             nome_1: proprietario.nome,
             telefone: proprietario.telefone,
         };
 
-        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_TB_PROPRIETARIO, // ID da tabela no Jestor
+            object_type: JESTOR_TB_PROPRIETARIO,
             data,
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Proprietario inserido no Jestor:\n\n', response.data);
-        console.log("--------------------------------------------------");
-        */
-        return response.data; // Retorna o dado inserido
+
+        logDebug('Proprietário', `🔹 Proprietário ${proprietario.nome} inserido com sucesso no Jestor!`);
+
+        return response.data;
 
     } catch (error: any) {
-        console.error('Erro ao inserir proprietario no Jestor:', error.response?.data || error.message);
-        throw new Error('Erro ao inserir proprietario no Jestor');
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao inserir proprietário ${proprietario.nome} no Jestor: ${errorMessage}`);
+        
+        await registrarErroJestor('proprietario', proprietario.id.toString(), errorMessage);
+        
+        throw new Error(`Erro ao inserir proprietário ${proprietario.nome} no Jestor`);
     }
 }
 
 /**
- * Sincroniza os proprietarios não sincronizados do banco local com o Jestor.
+ * Atualiza um proprietário existente no Jestor.
+ * @param proprietario - Dados do proprietário a serem atualizados.
+ * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function sincronizarProprietario() {
+export async function atualizarProprietarioNoJestor(proprietario: typeProprietario, idInterno: string) {
     try {
-        const proprietariosNaoSincronizados = await getProprietariosNaoSincronizados();
-
-        if(proprietariosNaoSincronizados){
-            for (const proprietario of proprietariosNaoSincronizados) {
-                const existeNoJestor = await verificarProprietarioNoJestor(proprietario.nome, proprietario.telefone);
-       
-                if (!existeNoJestor) {
-                    await inserirProprietarioNoJestor(proprietario);
-                    console.log("--------------------------------------------------");    
-                    console.log(`Proprietario: ${proprietario.nome}\nSincronizado com sucesso!`);
-
-                } else {
-                    console.log("--------------------------------------------------");
-                    console.log(`Proprietario: ${proprietario.nome}\nJa existe no Jestor. Atualizado no banco local.`);
-                }
-                // Atualiza o status no banco local para sincronizado
-                await atualizaCampoSincronizadoNoJestor('proprietario', proprietario.id, proprietario.nome ?? undefined, proprietario.telefone ?? undefined);
+        const data: Record<string, any> = {
+            object_type: JESTOR_TB_PROPRIETARIO,
+            data: {
+                [`id_${JESTOR_TB_PROPRIETARIO}`]: idInterno,
+                nome_1: proprietario.nome,
+                telefone: proprietario.telefone,
             }
+        };
+
+        const response = await jestorClient.post(ENDPOINT_UPDATE, data);
+
+        if (response.data?.status) {
+            logDebug('Proprietário', `🔹 Proprietário ${proprietario.nome} atualizado com sucesso no Jestor!`);
+        } else {
+            logDebug('Proprietário', `⚠️ Atualização do proprietário ${proprietario.nome} no Jestor retornou um status inesperado.`);
         }
+
+        return response.data;
+
     } catch (error: any) {
-        console.error('Erro ao sincronizar proprietario:', error.message);
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        
+        logDebug('Erro', `❌ Erro ao atualizar proprietário ${proprietario.nome} no Jestor: ${errorMessage}`);
+        
+        await registrarErroJestor("proprietario", proprietario.id.toString(), errorMessage);
+        
+        throw new Error(`Erro ao atualizar proprietário ${proprietario.nome} no Jestor`);
     }
 }
 
-/*funcao de teste
-(async () => {
-  await sincronizarProprietario();
-})();
-*/
+/**
+ * Sincroniza apenas UM proprietário específico com o Jestor.
+ */
+export async function sincronizarProprietario(proprietario: typeProprietario) {
+    try {
+        const idInterno = await obterIdInternoProprietarioNoJestor(proprietario.nome, proprietario.telefone);
+
+        if (!idInterno) {
+            await inserirProprietarioNoJestor(proprietario);
+        } else {
+            await atualizarProprietarioNoJestor(proprietario, idInterno);
+        }
+
+        await atualizaCampoSincronizadoNoJestor('proprietario', proprietario.id);
+
+    } catch (error: any) {
+        const errorMessage = error.message || 'Erro desconhecido';
+
+        logDebug('Erro', `❌ Erro ao sincronizar proprietário ${proprietario.nome}: ${errorMessage}`);
+        
+        await prisma.proprietario.update({
+            where: { id: proprietario.id },
+            data: { sincronizadoNoJestor: false },
+        });
+
+        throw new Error(`Erro ao sincronizar proprietário ${proprietario.nome}`);
+    }
+}

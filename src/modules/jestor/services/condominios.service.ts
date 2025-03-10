@@ -1,122 +1,146 @@
 import jestorClient from '../../../config/jestorClient';
 import { typeCondominio } from '../jestor.types'; 
-import { atualizaCampoSincronizadoNoJestor, getCondominiosNaoSincronizados } from '../../database/models';
+import { atualizaCampoSincronizadoNoJestor } from '../../database/models';
+import { registrarErroJestor } from '../../database/erro.service';
+import { logDebug } from '../../../utils/logger';
+import prisma from '../../../config/database';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
+const ENDPOINT_UPDATE = '/object/update';
 const JESTOR_TB_CONDOMINIO = 'w_zk_k73oj_eld8yvjn0u';
 
 /**
- * Verifica se um condominio com o nome fornecido já existe na tabela do Jestor.
- * @param - idExterno/SKU do condominio a ser verificado.
- * @returns - Um boolean indicando se o condominio já existe no Jestor.
+ * Consulta o Jestor para verificar se o condomínio existe e, se sim, retorna o ID interno.
+ * 
+ * @param idExterno - O ID externo do condomínio.
+ * @param sku - O SKU do condomínio.
+ * @returns - O ID interno do Jestor ou null se o condomínio não existir.
  */
-
-export async function verificarCondominioNoJestor(
-    idExterno: string,
-    sku: string | null, 
-) {
+export async function obterIdInternoCondominioNoJestor(idExterno: string, sku: string | null) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_TB_CONDOMINIO, // ID da tabela no Jestor
+            object_type: JESTOR_TB_CONDOMINIO,
             filters: [
-                        {
-                            field: 'idexterno', // Nome do campo no Jestor
-                            value: idExterno,
-                            operator: '==', // Operador para comparação
-                        },
-                        {
-                            field: 'sku', // nome interno do condominio
-                            value: sku,
-                            operator: '==',
-                        },
+                { field: 'idexterno', value: idExterno, operator: '==' },
+                { field: 'skuinternalname', value: sku, operator: '==' },
             ],
         });
 
-        // Garante que items está definido antes de verificar o tamanho
         const items = response.data?.data?.items;
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
-        console.log("--------------------------------------------------");
-        */
+
         if (Array.isArray(items) && items.length > 0) {
-            return true; // Condominio existe
+            const idInterno = items[0][`id_${JESTOR_TB_CONDOMINIO}`];
+            return idInterno ?? null;
         }
 
-        return false; // Condominio não existe
+        return null;
+
     } catch (error: any) {
-        console.error('Erro ao verificar condominio no Jestor:', error.message);
-        throw new Error('Erro ao verificar condominio no Jestor');
+        const errorMessage = error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao buscar condomínio no Jestor: ${errorMessage}`);
+        throw new Error('Erro ao buscar condomínio no Jestor');
     }
 }
 
 /**
- * Insere um condominio no Jestor.
- * @param condominio - Dados do condominio a serem inseridos.
+ * Insere um condomínio no Jestor.
+ * @param condominio - Dados do condomínio a serem inseridos.
  */
 export async function inserirCondominioNoJestor(condominio: typeCondominio) {
- 
     try {
-        // nome do campo no Jestor | nome do campo no banco de dados local
-        const data: any = {
-            idbdengnet: condominio.id, // ID do banco da API EngNet
+        const data: Record<string, any> = {
+            idbdengnet: condominio.id,
             idexterno: condominio.idExterno,
             idstays: condominio.idStays,
             skuinternalname: condominio.sku,
             regiao: condominio.regiao,
         };
 
-        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_TB_CONDOMINIO, // ID da tabela no Jestor
+            object_type: JESTOR_TB_CONDOMINIO,
             data,
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('condominio inserido no Jestor:\n\n', response.data);
-        console.log("--------------------------------------------------");
-        */
-        return response.data; // Retorna o dado inserido
+
+        logDebug('Condomínio', `✅ Condomínio ${condominio.idExterno} inserido com sucesso no Jestor!`);
+
+        return response.data;
 
     } catch (error: any) {
-        console.error('Erro ao inserir condominio no Jestor:', error.response?.data || error.message);
-        throw new Error('Erro ao inserir condominio no Jestor');
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao inserir condomínio ${condominio.idExterno} no Jestor: ${errorMessage}`);
+        
+        // 🔥 Registra o erro na tabela de sincronização
+        await registrarErroJestor('condominio', condominio.idExterno, errorMessage);
+        
+        throw new Error(`Erro ao inserir condomínio ${condominio.idExterno} no Jestor`);
     }
 }
 
 /**
- * Sincroniza os condominios não sincronizados do banco local com o Jestor.
+ * Atualiza um condomínio existente no Jestor.
+ * @param condominio - Dados do condomínio a serem atualizados.
+ * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function sincronizarCondominio() {
+export async function atualizarCondominioNoJestor(condominio: typeCondominio, idInterno: string) {
     try {
-        const condominiosNaoSincronizados = await getCondominiosNaoSincronizados();
-
-        if(condominiosNaoSincronizados){
-            for (const condominio of condominiosNaoSincronizados) {
-                const existeNoJestor = await verificarCondominioNoJestor(condominio.idExterno, condominio.sku);
-       
-                if (!existeNoJestor) {
-                    await inserirCondominioNoJestor(condominio);
-                    console.log("--------------------------------------------------");    
-                    console.log(`Condominio: ${condominio.idExterno}\nSincronizado com sucesso!`);
-                    
-                } else {
-                    console.log("--------------------------------------------------");
-                    console.log(`Condominio: ${condominio.idExterno}\nJa existe no Jestor. Atualizado no banco local.`);
-                    
-                }
-                // Atualiza o status no banco local para sincronizado
-                await atualizaCampoSincronizadoNoJestor('condominio', condominio.idExterno);
+        const data: Record<string, any> = {
+            object_type: JESTOR_TB_CONDOMINIO,
+            data: {
+                [`id_${JESTOR_TB_CONDOMINIO}`]: idInterno,
+                idexterno: condominio.idExterno,
+                idstays: condominio.idStays,
+                skuinternalname: condominio.sku,
+                regiao: condominio.regiao,
             }
+        };
+
+        const response = await jestorClient.post(ENDPOINT_UPDATE, data);
+
+        if (response.data?.status) {
+            logDebug('Condomínio', `🔹 Condomínio ${condominio.idExterno} atualizado com sucesso no Jestor!`);
+        } else {
+            logDebug('Condomínio', `⚠️ Atualização do condomínio ${condominio.idExterno} no Jestor retornou um status inesperado.`);
         }
+
+        return response.data;
+
     } catch (error: any) {
-        console.error('Erro ao sincronizar condominio:', error.message);
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+
+        logDebug('Erro', `❌ Erro ao atualizar condomínio ${condominio.idExterno} no Jestor: ${errorMessage}`);
+        
+        await registrarErroJestor("condominio", condominio.idExterno, errorMessage);
+        
+        throw new Error(`Erro ao atualizar condomínio ${condominio.idExterno} no Jestor`);
     }
 }
 
-/*funcao de teste
-(async () => {
-  await sincronizarCondominio();
-})();
-*/
+/**
+ * Sincroniza apenas UM condomínio específico com o Jestor.
+ */
+export async function sincronizarCondominio(condominio: typeCondominio) {
+    try {
+        const idInterno = await obterIdInternoCondominioNoJestor(condominio.idExterno, condominio.sku);
+
+        if (!idInterno) {
+            await inserirCondominioNoJestor(condominio);
+        } else {
+            await atualizarCondominioNoJestor(condominio, idInterno);
+        }
+
+        await atualizaCampoSincronizadoNoJestor('condominio', condominio.idExterno);
+
+    } catch (error: any) {
+        const errorMessage = error.message || 'Erro desconhecido';
+
+        logDebug('Erro', `❌ Erro ao sincronizar condomínio ${condominio.idExterno}: ${errorMessage}`);
+        
+        await prisma.condominio.update({
+            where: { idExterno: condominio.idExterno },
+            data: { sincronizadoNoJestor: false },
+        });
+
+        throw new Error(`Erro ao sincronizar condomínio ${condominio.idExterno}`);
+    }
+}

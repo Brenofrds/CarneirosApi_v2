@@ -8,7 +8,7 @@ import { sincronizarProprietario } from './services/proprietarios.service';
 import { sincronizarReserva } from './services/reservas.service';
 import { sincronizarTaxaReserva } from './services/taxasReservas.service';
 
-
+/*
 export async function sincronizarTudo() {
     try {
         console.log('Iniciando sincronização de agentes...');
@@ -51,3 +51,4 @@ export async function sincronizarTudo() {
         console.error('Erro durante a sincronização geral:', error.message);
     }
 }
+*/

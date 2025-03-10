@@ -135,3 +135,21 @@ model Bloqueio {
 
   @@unique([idExterno, imovelId]) // Garante que o mesmo bloqueio não seja cadastrado duas vezes para o mesmo imóvel
 }
+
+model ErroSincronizacaoJestor {
+  id           Int      @id @default(autoincrement())
+  tabela       String   // Nome da tabela no banco de dados (ex: "reserva", "imovel")
+  registroId   String   // ID do registro no banco de dados
+  erro         String   // Mensagem de erro
+  tentativas   Int      @default(0) // Número de tentativas de reenvio
+  dataErro     DateTime @default(now()) // Data do erro
+}
+
+model ErroSincronizacaoStays {
+  id           Int      @id @default(autoincrement())
+  acao         String   // Ação do webhook (ex: "reservation.modified")
+  payloadId    String   // ID do payload da Stays
+  erro         String   // Mensagem de erro
+  tentativas   Int      @default(0) // Número de tentativas de reprocessamento
+  dataErro     DateTime @default(now()) // Data do erro
+}

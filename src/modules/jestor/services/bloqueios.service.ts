@@ -1,57 +1,49 @@
 import jestorClient from '../../../config/jestorClient';
-import { typeBloqueio } from '../jestor.types';
+import { typeBloqueio } from '../jestor.types'; 
 import { atualizaCampoSincronizadoNoJestor, getBloqueiosNaoSincronizados } from '../../database/models';
+import { registrarErroJestor } from '../../database/erro.service';
+import prisma from '../../../config/database';
+import { logDebug } from '../../../utils/logger';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
+const ENDPOINT_UPDATE = '/object/update';
 const JESTOR_TB_BLOQUEIO = 'e0bldzqfovxjs42u67wqk';
 
 /**
- * Verifica se um agente com o nome fornecido já existe na tabela do Jestor.
- * @param nome - Nome do agente a ser verificado.
- * @returns - Um boolean indicando se o agente já existe no Jestor.
+ * Consulta o Jestor para verificar se o bloqueio existe e, se sim, retorna o ID interno.
+ * @param idExterno - O ID externo do bloqueio.
+ * @returns - O ID interno do Jestor ou null se o bloqueio não existir.
  */
-
-export async function verificarBloqueioNoJestor(nome: string) {
+export async function obterIdInternoBloqueioNoJestor(idExterno: string) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_TB_BLOQUEIO, // ID da tabela no Jestor
-            filters: [
-                {
-                    field: 'idexterno_1', // Nome do campo no Jestor
-                    value: nome,
-                    operator: '==', // Operador para comparação
-                },
-            ],
+            object_type: JESTOR_TB_BLOQUEIO,
+            filters: [{ field: 'idexterno_1', value: idExterno, operator: '==' }],
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
-        console.log("--------------------------------------------------");
-        */
-        // Garante que items está definido antes de verificar o tamanho
+
         const items = response.data?.data?.items;
 
         if (Array.isArray(items) && items.length > 0) {
-            return true; // Bloqueio existe
+            return items[0][`id_${JESTOR_TB_BLOQUEIO}`] ?? null;
         }
 
-        return false; // Bloqueio não existe
+        return null;
+
     } catch (error: any) {
-        console.error('Erro ao verificar Bloqueio no Jestor:', error.message);
-        throw new Error('Erro ao verificar Bloqueio no Jestor');
+        const errorMessage = error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao buscar bloqueio no Jestor: ${errorMessage}`);
+        throw new Error('Erro ao buscar bloqueio no Jestor');
     }
 }
 
 /**
- * Insere um Bloqueio no Jestor.
- * @param Bloqueio - Dados do Bloqueio a serem inseridos.
+ * Insere um bloqueio no Jestor.
+ * @param bloqueio - Dados do bloqueio a serem inseridos.
  */
 export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio) {
-
     try {
-        // nome do campo no Jestor | nome do campo no banco de dados local
-        const data: any = {
+        const data: Record<string, any> = {
             idapi: bloqueio.id,
             idexterno_1: bloqueio.idExterno,
             localizador: bloqueio.localizador,
@@ -61,58 +53,85 @@ export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio) {
             horacheckout: bloqueio.horaCheckOut,
             notainterna: bloqueio.notaInterna,
             imovelid: bloqueio.imovelId,
-        }
+        };
 
-        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_TB_BLOQUEIO, // ID da tabela no Jestor
+            object_type: JESTOR_TB_BLOQUEIO,
             data,
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Bloqueio inserido no Jestor:\n\n', response.data);
-        console.log("--------------------------------------------------");
-        */
-        return response.data; // Retorna o dado inserido
+
+        logDebug('Bloqueio', `✅ Bloqueio ${bloqueio.idExterno} inserido com sucesso no Jestor!`);
+
+        return response.data;
 
     } catch (error: any) {
-        console.error('Erro ao inserir Bloqueio no Jestor:', error.response?.data || error.message);
-        throw new Error('Erro ao inserir Bloqueio no Jestor');
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao inserir bloqueio ${bloqueio.idExterno} no Jestor: ${errorMessage}`);
+        await registrarErroJestor('bloqueio', bloqueio.idExterno, errorMessage);
+        throw new Error(`Erro ao inserir bloqueio ${bloqueio.idExterno} no Jestor`);
     }
 }
 
 /**
- * Sincroniza os Bloqueios não sincronizados do banco local com o Jestor.
+ * Atualiza um bloqueio existente no Jestor.
+ * @param bloqueio - Dados do bloqueio a serem atualizados.
+ * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function sincronizarBloqueio() {
+export async function atualizarBloqueioNoJestor(bloqueio: typeBloqueio, idInterno: string) {
     try {
-        const bloqueiosNaoSincronizados = await getBloqueiosNaoSincronizados();
-        
-        if(bloqueiosNaoSincronizados){
-            for (const bloqueio of bloqueiosNaoSincronizados) {
-                const existeNoJestor = await verificarBloqueioNoJestor(bloqueio.idExterno);
-
-                if (!existeNoJestor) {
-                    await inserirBloqueioNoJestor(bloqueio);
-                    console.log("--------------------------------------------------");
-                    console.log(`Bloqueio ${bloqueio.idExterno}\nSincronizado com sucesso!`);
-                    
-                } else {
-                    console.log("--------------------------------------------------");
-                    console.log(`Bloqueio: ${bloqueio.idExterno}\nJa existe no Jestor. Atualizado no banco local.`);
-                    
-                }
-                // Atualiza o status no banco local para sincronizado
-                await atualizaCampoSincronizadoNoJestor('bloqueio', bloqueio.idExterno);
+        const data: Record<string, any> = {
+            object_type: JESTOR_TB_BLOQUEIO,
+            data: {
+                [`id_${JESTOR_TB_BLOQUEIO}`]: idInterno, // Campo obrigatório do ID interno
+                localizador: bloqueio.localizador,
+                checkin: bloqueio.checkIn,
+                checkout: bloqueio.checkOut,
+                status: 'Deletado',
             }
-        }
+        };
+
+        const response = await jestorClient.post(ENDPOINT_UPDATE, data);
+
+        logDebug('Bloqueio', `🔹 Bloqueio ${bloqueio.idExterno} atualizado com sucesso no Jestor!`);
+
+        return response.data;
+
     } catch (error: any) {
-        console.error('Erro ao sincronizar Canais:', error.message);
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+
+        logDebug('Erro', `❌ Erro ao atualizar bloqueio ${bloqueio.idExterno} no Jestor: ${errorMessage}`);
+
+        await registrarErroJestor('bloqueio', bloqueio.idExterno, errorMessage);
+
+        throw new Error(`Erro ao atualizar bloqueio ${bloqueio.idExterno} no Jestor`);
     }
 }
 
-/*funcao de teste
-(async () => {
-  await sincronizarBloqueio();
-})();
-*/
+/**
+ * Sincroniza apenas UM bloqueio específico com o Jestor.
+ */
+export async function sincronizarBloqueio(bloqueio: typeBloqueio) {
+    try {
+        const idInterno = await obterIdInternoBloqueioNoJestor(bloqueio.idExterno);
+
+        if (!idInterno) {
+            await inserirBloqueioNoJestor(bloqueio);
+        } else {
+            await atualizarBloqueioNoJestor(bloqueio, idInterno);
+        }
+
+        await atualizaCampoSincronizadoNoJestor('bloqueio', bloqueio.idExterno);
+
+    } catch (error: any) {
+        const errorMessage = error.message || 'Erro desconhecido';
+
+        logDebug('Erro', `❌ Erro ao sincronizar bloqueio ${bloqueio.idExterno}: ${errorMessage}`);
+
+        await prisma.bloqueio.update({
+            where: { idExterno: bloqueio.idExterno },
+            data: { sincronizadoNoJestor: false },
+        });
+
+        throw new Error(`Erro ao sincronizar bloqueio ${bloqueio.idExterno}`);
+    }
+}
