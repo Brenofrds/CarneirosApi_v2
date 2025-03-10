@@ -1,7 +1,8 @@
 import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado, fetchCondominioDetalhado, fetchReservaDetalhada } from './services/fetchService';
 import { transformReserva, transformAgente, transformCanal, transformBloqueio } from './services/transformService';
-import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva, salvarProprietario, salvarBloqueio } from "./services/saveService";
+import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva, salvarProprietario, salvarBloqueio, salvarAgente, salvarCanal } from "./services/saveService";
 import prisma from "../../config/database"; // Importa o cliente Prisma
+import { logDebug } from '../../utils/logger';
 
 
 /**
@@ -10,35 +11,52 @@ import prisma from "../../config/database"; // Importa o cliente Prisma
  */
 export const processWebhookData = async (body: any) => {
   const { action, payload } = body;
-  if (!action || !payload) throw new Error("Dados inválidos: 'action' ou 'payload' ausentes.");
-
-  switch (action) {
-    case "reservation.created":
-    case "reservation.modified":
-      return payload.type === "blocked"
-        ? await processarBloqueioWebhook(payload)
-        : await processarReservaWebhook(payload);
-
-    case "reservation.canceled":
-      return await processarAtualizacaoStatus(payload, "Cancelada");
-
-    case "reservation.deleted":
-      return await processarAtualizacaoStatus(payload, "Deletada");
-
-    case "listing.modified":
-    case "listing.created":
-      return await processarListingWebhook(payload);
-
-    default:
-      throw new Error(`Ação desconhecida: ${action}`);
+  
+  // 🚨 Log apenas em caso de erro de dados
+  if (!action || !payload) {
+      logDebug('Erro', "Dados inválidos: 'action' ou 'payload' ausentes.");
+      throw new Error("Dados inválidos: 'action' ou 'payload' ausentes.");
   }
+
+  try {
+      switch (action) {
+          case "reservation.created":
+          case "reservation.modified":
+              logDebug('Reserva', `Processando ${action} para o ID ${payload._id}`);
+              return payload.type === "blocked"
+                  ? await processarBloqueioWebhook(payload)
+                  : await processarReservaWebhook(payload);
+
+          case "reservation.canceled":
+              logDebug('Reserva', `Cancelando reserva ID ${payload._id}`);
+              return await processarAtualizacaoStatus(payload, "Cancelada");
+
+          case "reservation.deleted":
+              logDebug('Reserva', `Deletando reserva ID ${payload._id}`);
+              return await processarAtualizacaoStatus(payload, "Deletada");
+
+          case "listing.modified":
+          case "listing.created":
+              logDebug('Imóvel', `Processando ${action} para o ID ${payload._id}`);
+              return await processarListingWebhook(payload);
+
+          default:
+              logDebug('Erro', `Ação desconhecida recebida: ${action}`);
+              
+              throw new Error(`Ação desconhecida: ${action}`);
+      }
+      
+  } catch (error: any) {
+      logDebug('Erro', `Erro ao processar ação ${action}`, error.message);
+      
+      throw new Error(`Erro ao processar ação ${action}: ${error.message}`);
+  }
+
 };
 
 
 const processarReservaWebhook = async (payload: any) => {
   try {
-    console.log(` Processando webhook para reserva ${payload._id}`);
-
     // 🔹 Transformar os dados da reserva recebidos no formato correto para salvar
     const reservaData = transformReserva(payload);
     const agenteData = transformAgente(payload.agent);
@@ -47,57 +65,13 @@ const processarReservaWebhook = async (payload: any) => {
     // 🔹 Criar/Atualizar Agente e obter ID do banco
     let agenteId: number | null = null;
     if (agenteData) {
-      // Busca agente existente para comparar os dados
-      const agenteExistente = await prisma.agente.findUnique({
-        where: { idExterno: agenteData._id },
-        select: { nome: true, sincronizadoNoJestor: true }
-      });
-
-      // Verifica se precisa atualizar (se o nome for diferente)
-      const precisaAtualizar = !agenteExistente || agenteExistente.nome !== agenteData.name;
-
-      const agenteSalvo = await prisma.agente.upsert({
-        where: { idExterno: agenteData._id },
-        update: { 
-          nome: agenteData.name, 
-          sincronizadoNoJestor: precisaAtualizar ? false : agenteExistente?.sincronizadoNoJestor 
-        },
-        create: { 
-          idExterno: agenteData._id, 
-          nome: agenteData.name, 
-          sincronizadoNoJestor: false 
-        },
-        select: { id: true }, //  Retorna apenas o ID do banco
-      });
-      agenteId = agenteSalvo.id;
+      agenteId = await salvarAgente(agenteData);
     }
 
     // 🔹 Criar/Atualizar Canal e obter ID do banco
     let canalId: number | null = null;
     if (canalData) {
-      // Busca canal existente para comparar os dados
-      const canalExistente = await prisma.canal.findUnique({
-        where: { idExterno: canalData._id },
-        select: { titulo: true, sincronizadoNoJestor: true }
-      });
-
-      // Verifica se precisa atualizar (se o título for diferente)
-      const precisaAtualizar = !canalExistente || canalExistente.titulo !== canalData.titulo;
-
-      const canalSalvo = await prisma.canal.upsert({
-        where: { idExterno: canalData._id }, 
-        update: { 
-          titulo: canalData.titulo,
-          sincronizadoNoJestor: precisaAtualizar ? false : canalExistente?.sincronizadoNoJestor 
-        },
-        create: { 
-          idExterno: canalData._id, 
-          titulo: canalData.titulo, 
-          sincronizadoNoJestor: false 
-        },
-        select: { id: true }, //  Retorna apenas o ID do banco
-      });
-      canalId = canalSalvo.id;
+      canalId = await salvarCanal(canalData);
     }
 
     // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
@@ -133,15 +107,10 @@ const processarReservaWebhook = async (payload: any) => {
       }
     }
 
-
     // 🔹 Atualiza a reserva com os IDs corretos
     reservaData.imovelId = imovelId;
     reservaData.agenteId = agenteId;
     reservaData.canalId = canalId;
-
-    console.log("🔍 Dados transformados para salvar reserva:", reservaData);
-    console.log("🔍 Agente salvo ID:", agenteId);
-    console.log("🔍 Canal salvo ID:", canalId);
 
     // 🔹 Salvar Reserva no banco com os IDs corretos
     const reservaSalva = await salvarReserva(reservaData);
@@ -163,10 +132,14 @@ const processarReservaWebhook = async (payload: any) => {
 
     await salvarTaxasReserva(taxasReservas);
 
+    logDebug('Reserva', `Reserva ${reservaData.localizador} processada com sucesso!`);
+    
     return reservaSalva;
-  } catch (error) {
-    console.error("Erro ao processar reserva via webhook:", error);
-    throw new Error("Erro ao processar reserva.");
+
+  } catch (error: any) {
+    logDebug('Erro', `Erro ao processar reserva ${payload._id}: ${error.message}`);
+    
+    throw new Error(`Erro ao processar reserva ${payload._id}`);
   }
 };
 
@@ -229,54 +202,67 @@ export const processarBloqueioWebhook = async (payload: any) => {
     const bloqueioSalvo = await salvarBloqueio(bloqueioData);
 
     console.log(` Bloqueio salvo com sucesso: ${bloqueioSalvo.id}`);
+    
     return bloqueioSalvo;
   } catch (error) {
     console.error(" Erro ao processar bloqueio:", error);
+    
     throw new Error("Erro ao processar bloqueio.");
   }
 };
 
 
 /**
- * Processa notificações de cancelamento de reservas (reservation.canceled)
- * Essa função busca a reserva no banco e atualiza seu status para "Cancelada".
+ * Processa notificações de cancelamento ou exclusão de reservas (reservation.canceled/reservation.deleted).
+ * Se a reserva ou o bloqueio não existirem, tenta criar um novo registro completo usando processarReservaWebhook.
  *
- * @param payload - Objeto contendo os dados da reserva cancelada.
+ * @param payload - Objeto contendo os dados da reserva ou bloqueio.
+ * @param novoStatus - Novo status a ser atribuído ("Cancelada" ou "Deletada").
  */
 const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
   try {
-    console.log(` Processando atualização para ${novoStatus}: ${payload._id}`);
+    console.log(`🛠️ Processando atualização para ${novoStatus}: ${payload._id}`);
+    
+    // 🔍 Exibe o payload completo para análise
+    console.log("🔍 Payload recebido:", JSON.stringify(payload, null, 2));
 
-    // 🔹 Busca no banco de dados se o `idExterno` pertence a uma reserva ou um bloqueio
-    const reservaExistente = await prisma.reserva.findUnique({ where: { idExterno: payload._id } });
-    const bloqueioExistente = await prisma.bloqueio.findUnique({ where: { idExterno: payload._id } });
+    // 🔹 Tenta localizar a reserva ou o bloqueio pelo ID externo
+    let reservaExistente = await prisma.reserva.findUnique({ where: { idExterno: payload._id } });
+    let bloqueioExistente = await prisma.bloqueio.findUnique({ where: { idExterno: payload._id } });
 
     if (!reservaExistente && !bloqueioExistente) {
-      console.warn(` Nenhuma reserva ou bloqueio encontrado para o ID ${payload._id}.`);
-      return null;
+      console.warn(`⚠️ Nenhuma reserva ou bloqueio encontrado para o ID ${payload._id}. Tentando criar novo registro...`);
+
+      // Tenta processar o webhook como uma nova reserva
+      try {
+        return await processarReservaWebhook(payload);
+      } catch (error) {
+        console.error(`❌ Erro ao tentar criar nova reserva/bloqueio:`, error);
+        throw new Error(`Erro ao criar nova reserva/bloqueio para ID ${payload._id}`);
+      }
     }
 
-    // 🔹 Se for reserva, atualiza o status
+    // 🔄 Atualiza o status da reserva existente
     if (reservaExistente) {
       const reservaAtualizada = await prisma.reserva.update({
         where: { idExterno: payload._id },
         data: { status: novoStatus, sincronizadoNoJestor: false },
       });
-      console.log(` Reserva ${payload._id} atualizada para "${novoStatus}".`);
+      console.log(`✅ Reserva ${payload._id} atualizada para "${novoStatus}".`);
       return reservaAtualizada;
     }
 
-    // 🔹 Se for bloqueio, atualiza o status
+    // 🔄 Atualiza o status do bloqueio existente
     if (bloqueioExistente) {
       const bloqueioAtualizado = await prisma.bloqueio.update({
         where: { idExterno: payload._id },
         data: { notaInterna: `Status atualizado para ${novoStatus}`, sincronizadoNoJestor: false },
       });
-      console.log(` Bloqueio ${payload._id} atualizado para "${novoStatus}".`);
+      console.log(`✅ Bloqueio ${payload._id} atualizado para "${novoStatus}".`);
       return bloqueioAtualizado;
     }
   } catch (error) {
-    console.error(` Erro ao atualizar status para "${novoStatus}":`, error);
+    console.error(`❌ Erro ao atualizar status para "${novoStatus}":`, error);
     throw new Error(`Erro ao atualizar status para "${novoStatus}".`);
   }
 };
@@ -288,8 +274,6 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
  */
 export const processarListingWebhook = async (payload: any) => {
   try {
-    console.log(` Processando webhook para imóvel ${payload._id}`);
-
     // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
     let imovelId: number | null = null;
 
@@ -302,8 +286,6 @@ export const processarListingWebhook = async (payload: any) => {
         const imovelSalvo = await salvarImovel(imovel);
         imovelId = imovelSalvo.id;
 
-        console.log(` Imóvel salvo/atualizado: ${imovelSalvo.idExterno} (ID Interno: ${imovelId})`);
-
         // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio em paralelo
         if (imovel._idproperty) {
           fetchCondominioDetalhado(imovel._idproperty).then(async (condominioDetalhado) => {
@@ -313,28 +295,24 @@ export const processarListingWebhook = async (payload: any) => {
           });
         }
 
-        // 🔹 Se houver um proprietário, salvar no banco
+        // 🔹 Se houver um proprietário, salvar no banco e associar ao imóvel
         if (proprietario) {
           const proprietarioId = await salvarProprietario(proprietario.nome, proprietario.telefone);
 
-          // 🔹 Atualizar o imóvel para associá-lo ao proprietário
           await prisma.imovel.update({
             where: { id: imovelId },
             data: { proprietarioId },
           });
-
-          console.log(` Proprietário salvo/atualizado e vinculado ao imóvel: ${proprietario.nome}`);
         }
-      } else {
-        console.warn(` Imóvel ${payload._id} não encontrado na API da Stays.`);
       }
     }
 
-    console.log(` Processamento concluído para imóvel ${payload._id}`);
+    logDebug('Imovel', `Imovel ${payload._id} processado com sucesso!`);
+
     return imovelId;
 
-  } catch (error) {
-    console.error(" Erro ao processar listagem de imóvel:", error);
-    throw new Error("Erro ao processar listagem de imóvel.");
+  } catch (error: any) {
+    logDebug('Erro', `Erro ao processar listagem de imóvel ${payload._id}: ${error.message}`);
+    throw new Error(`Erro ao processar listagem de imóvel ${payload._id}`);
   }
 };

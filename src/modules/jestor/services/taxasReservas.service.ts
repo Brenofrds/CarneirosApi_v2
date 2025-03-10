@@ -1,121 +1,137 @@
 import jestorClient from '../../../config/jestorClient';
 import { typeTaxaReserva } from '../jestor.types'; 
-import { atualizaCampoSincronizadoNoJestor, getTaxasReservasNaoSincronizados } from '../../database/models';
+import { atualizaCampoSincronizadoNoJestor } from '../../database/models';
+import { registrarErroJestor } from '../../database/erro.service';
+import { logDebug } from '../../../utils/logger';
+import prisma from '../../../config/database';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
+const ENDPOINT_UPDATE = '/object/update';
 const JESTOR_TB_TAXARESERVA = '7l02yg9daf48d5cfmzbsm';
 
 /**
- * Verifica se um taxaReserva com o id e nome fornecido já existe na tabela do Jestor.
- * @param - idExterno/SKU do taxaReserva a ser verificado.
- * @returns - Um boolean indicando se o taxaReserva já existe no Jestor.
+ * Consulta o Jestor para verificar se a taxa de reserva existe e, se sim, retorna o ID interno.
+ * 
+ * @param id - O ID da taxa de reserva.
+ * @param nome - O nome da taxa de reserva.
+ * @returns - O ID interno do Jestor ou null se a taxa de reserva não existir.
  */
-
-export async function verificarTaxaReservaNoJestor(
-    id: string | number,
-    nome: string | null, 
-) {
+export async function obterIdInternoTaxaReservaNoJestor(id: string | number, nome: string | null) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_TB_TAXARESERVA, // ID da tabela no Jestor
+            object_type: JESTOR_TB_TAXARESERVA,
             filters: [
-                        {
-                            field: 'idbdapi', // Nome do campo no Jestor
-                            value: id,
-                            operator: '==', // Operador para comparação
-                        },
-                        {
-                            field: 'nometaxa', // nome interno do taxaReserva
-                            value: nome,
-                            operator: '==',
-                        },
+                { field: 'idbdapi', value: id, operator: '==' },
+                { field: 'nometaxa', value: nome, operator: '==' },
             ],
         });
 
-        // Garante que items está definido antes de verificar o tamanho
         const items = response.data?.data?.items;
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
-        console.log("--------------------------------------------------");
-        */
+
         if (Array.isArray(items) && items.length > 0) {
-            return true; // taxaReserva existe
+            const idInterno = items[0][`id_${JESTOR_TB_TAXARESERVA}`];
+            return idInterno ?? null;
         }
 
-        return false; // taxaReserva não existe
+        return null;
+
     } catch (error: any) {
-        console.error('Erro ao verificar taxaReserva no Jestor:', error.message);
-        throw new Error('Erro ao verificar taxaReserva no Jestor');
+        const errorMessage = error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao buscar taxa de reserva no Jestor: ${errorMessage}`);
+        throw new Error('Erro ao buscar taxa de reserva no Jestor');
     }
 }
 
 /**
- * Insere um taxaReserva no Jestor.
- * @param taxaReserva - Dados do taxaReserva a serem inseridos.
+ * Insere uma taxa de reserva no Jestor.
+ * @param taxaReserva - Dados da taxa de reserva a serem inseridos.
  */
 export async function inserirTaxaReservaNoJestor(taxaReserva: typeTaxaReserva) {
- 
     try {
-        // nome do campo no Jestor | nome do campo no banco de dados local
-        const data: any = {
-            idbdapi: taxaReserva.id, // ID do banco da API EngNet
+        const data: Record<string, any> = {
+            idbdapi: taxaReserva.id,
             reservaid: taxaReserva.reservaId,
             nometaxa: taxaReserva.name,
             valor: taxaReserva.valor,
         };
 
-        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_TB_TAXARESERVA, // ID da tabela no Jestor
+            object_type: JESTOR_TB_TAXARESERVA,
             data,
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('taxaReserva inserido no Jestor:\n\n', response.data);
-        console.log("--------------------------------------------------");
-        */
-        return response.data; // Retorna o dado inserido
+
+        logDebug('TaxaReserva', `✅ TaxaReserva ${taxaReserva.name} inserida com sucesso no Jestor!`);
+
+        return response.data;
 
     } catch (error: any) {
-        console.error('Erro ao inserir taxaReserva no Jestor:', error.response?.data || error.message);
-        throw new Error('Erro ao inserir taxaReserva no Jestor');
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao inserir taxa de reserva ${taxaReserva.name} no Jestor: ${errorMessage}`);
+        await registrarErroJestor('taxaReserva', taxaReserva.id.toString(), errorMessage);
+        throw new Error(`Erro ao inserir taxa de reserva ${taxaReserva.name} no Jestor`);
     }
 }
 
 /**
- * Sincroniza os taxasReservas não sincronizados do banco local com o Jestor.
+ * Atualiza uma taxa de reserva existente no Jestor.
+ * @param taxaReserva - Dados da taxa de reserva a serem atualizados.
+ * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function sincronizarTaxaReserva() {
+export async function atualizarTaxaReservaNoJestor(taxaReserva: typeTaxaReserva, idInterno: string) {
     try {
-        const taxasReservasNaoSincronizados = await getTaxasReservasNaoSincronizados();
-
-        if(taxasReservasNaoSincronizados){
-            for (const taxaReserva of taxasReservasNaoSincronizados) {
-                const existeNoJestor = await verificarTaxaReservaNoJestor(taxaReserva.id, taxaReserva.name);
-       
-                if (!existeNoJestor) {
-                    await inserirTaxaReservaNoJestor(taxaReserva);
-                    console.log("--------------------------------------------------");    
-                    console.log(`TaxaReserva: ${taxaReserva.id} ${taxaReserva.name}\nSincronizado com sucesso!`);
-
-                } else {
-                    console.log("--------------------------------------------------");
-                    console.log(`TaxaReserva: ${taxaReserva.id} ${taxaReserva.name}\nJa existe no Jestor. Atualizado no banco local.`);
-
-                }
-                // Atualiza o status no banco local para sincronizado
-                await atualizaCampoSincronizadoNoJestor('taxaReserva', taxaReserva.id, taxaReserva.name);
+        const data: Record<string, any> = {
+            object_type: JESTOR_TB_TAXARESERVA,
+            data: {
+                [`id_${JESTOR_TB_TAXARESERVA}`]: idInterno,
+                reservaid: taxaReserva.reservaId,
+                nometaxa: taxaReserva.name,
+                valor: taxaReserva.valor,
             }
+        };
+
+        const response = await jestorClient.post(ENDPOINT_UPDATE, data);
+
+        if (response.data?.status) {
+            logDebug('TaxaReserva', `🔹 TaxaReserva ${taxaReserva.name} atualizada com sucesso no Jestor!`);
+        } else {
+            logDebug('TaxaReserva', `⚠️ Atualização da taxa de reserva ${taxaReserva.name} no Jestor retornou um status inesperado.`);
         }
+
+        return response.data;
+
     } catch (error: any) {
-        console.error('Erro ao sincronizar taxaReserva:', error.message);
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao atualizar taxa de reserva ${taxaReserva.name} no Jestor: ${errorMessage}`);
+        await registrarErroJestor('taxaReserva', taxaReserva.id.toString(), errorMessage);
+        throw new Error(`Erro ao atualizar taxa de reserva ${taxaReserva.name} no Jestor`);
     }
 }
 
-/* funcao de teste
-(async () => {
-  await sincronizarTaxaReserva();
-})();
-*/
+/**
+ * Sincroniza apenas UMA taxa de reserva específica com o Jestor.
+ */
+export async function sincronizarTaxaReserva(taxaReserva: typeTaxaReserva) {
+    try {
+        const idInterno = await obterIdInternoTaxaReservaNoJestor(taxaReserva.id, taxaReserva.name);
+
+        if (!idInterno) {
+            await inserirTaxaReservaNoJestor(taxaReserva);
+        } else {
+            await atualizarTaxaReservaNoJestor(taxaReserva, idInterno);
+        }
+
+        await atualizaCampoSincronizadoNoJestor('taxaReserva', taxaReserva.id.toString());
+
+    } catch (error: any) {
+        const errorMessage = error.message || 'Erro desconhecido';
+
+        logDebug('Erro', `❌ Erro ao sincronizar taxa de reserva ${taxaReserva.name}: ${errorMessage}`);
+        await prisma.taxaReserva.update({
+            where: { id: taxaReserva.id },
+            data: { sincronizadoNoJestor: false },
+        });
+
+        throw new Error(`Erro ao sincronizar taxa de reserva ${taxaReserva.name}`);
+    }
+}

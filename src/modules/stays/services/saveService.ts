@@ -1,122 +1,157 @@
 import prisma from '../../../config/database';
 import { ReservaData, HospedeDetalhado, AgenteDetalhado, ImovelDetalhado, CondominioDetalhado, TaxaReservaDetalhada, CanalDetalhado, BloqueioDetalhado } from '../stays.types';
+import { registrarErroJestor } from "../../database/erro.service"; // Importa a função que salva erros
+import { sincronizarReserva } from "../../jestor/services/reservas.service";
+import { sincronizarImovel } from "../../jestor/services/imoveis.service";
+import { sincronizarHospede } from '../../jestor/services/hospedes.service';
+import { sincronizarCondominio } from '../../jestor/services/condominios.service';
+import { sincronizarProprietario } from '../../jestor/services/proprietarios.service';
+import { sincronizarTaxaReserva } from '../../jestor/services/taxasReservas.service';
+import { sincronizarBloqueio } from '../../jestor/services/bloqueios.service';
+import { sincronizarCanal } from '../../jestor/services/canais.service';
+import { sincronizarAgente } from '../../jestor/services/agentes.service';
 
+
+import { logDebug } from '../../../utils/logger';
 
 export async function salvarReserva(reserva: ReservaData) {
-  // 🔹 Verifica se a reserva já existe no banco de dados pelo localizador (campo único)
   const reservaExistente = await prisma.reserva.findUnique({
     where: { localizador: reserva.localizador },
   });
 
-  /**
-   * 🔹 Determina se a reserva precisa ser atualizada
-   * 
-   * O critério para atualizar é:
-   * 1️⃣ Se `reservaExistente` for `null`, significa que a reserva não existe → Precisa ser criada.
-   * 2️⃣ Se `reservaExistente` existir, compararmos o objeto salvo com o novo objeto `reserva`:
-   *     - Se forem diferentes (`JSON.stringify(reservaExistente) !== JSON.stringify(reserva)`), então houve uma mudança → Precisa ser atualizada.
-   *     - Se forem iguais, significa que os dados já estão corretos → Não precisa atualizar.
-   */
   const precisaAtualizar =
-    !reservaExistente || // Reserva não existe? Então precisa ser salva.
-    JSON.stringify(reservaExistente) !== JSON.stringify(reserva); // Compara se os dados mudaram.
+    !reservaExistente ||
+    JSON.stringify(reservaExistente) !== JSON.stringify(reserva);
 
-  /**
-   * 🔹 Realiza um `upsert` para criar ou atualizar a reserva.
-   * 
-   * `upsert`: Se a reserva já existir, atualiza; se não existir, cria.
-   */
-  return await prisma.reserva.upsert({
-    where: { localizador: reserva.localizador }, // 🔍 Usa o localizador como identificador único.
-
-    // 🔄 Atualiza a reserva se ela já existir
+  const reservaSalva = await prisma.reserva.upsert({
+    where: { localizador: reserva.localizador },
     update: {
-      ...reserva, // ✅ Copia todos os dados da reserva
-      imovelId: reserva.imovelId ?? null, // 🏠 Atualiza o ID do imóvel (ou `null` se não existir)
-      agenteId: reserva.agenteId,  // 🔗 Atualiza o ID do agente no banco
-      canalId: reserva.canalId,    // 🔗 Atualiza o ID do canal no banco
-
-      /**
-       * 🔹 Atualiza o campo `sincronizadoNoJestor`
-       * 
-       * - Se a reserva precisa ser atualizada (`precisaAtualizar === true`), então define como `false` (ainda não sincronizada).
-       * - Se a reserva não mudou (`precisaAtualizar === false`), mantém o valor original do banco (`reservaExistente?.sincronizadoNoJestor`).
-       */
+      ...reserva,
+      imovelId: reserva.imovelId ?? null,
+      agenteId: reserva.agenteId,
+      canalId: reserva.canalId,
       sincronizadoNoJestor: precisaAtualizar ? false : reservaExistente?.sincronizadoNoJestor,
     },
-
-    // 🆕 Se a reserva ainda não existir, cria um novo registro
     create: {
-      ...reserva, // ✅ Copia todos os dados da reserva
-      imovelId: reserva.imovelId ?? null, // 🏠 Associa a um imóvel (ou `null` se não existir)
-      agenteId: reserva.agenteId,  // 🔗 Associa a um agente
-      canalId: reserva.canalId,    // 🔗 Associa a um canal
-
-      /**
-       * 🔹 Sempre define `sincronizadoNoJestor = false` ao criar uma nova reserva
-       * Isso garante que novas reservas serão sincronizadas posteriormente.
-       */
+      ...reserva,
+      imovelId: reserva.imovelId ?? null,
+      agenteId: reserva.agenteId,
+      canalId: reserva.canalId,
       sincronizadoNoJestor: false,
     },
   });
+
+  try {
+    // 🚀 Tenta sincronizar com o Jestor imediatamente após salvar no banco
+    await sincronizarReserva(reservaSalva);
+    
+    // ✅ Se deu certo, atualiza o campo `sincronizadoNoJestor`
+    await prisma.reserva.update({
+      where: { id: reservaSalva.id },
+      data: { sincronizadoNoJestor: true },
+    });
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Erro desconhecido';
+
+    logDebug('Erro', `❌ Erro ao sincronizar reserva ${reservaSalva.localizador} com Jestor: ${errorMessage}`);
+    
+    // 🔥 Salva o erro na tabela ErroSincronizacao
+    await registrarErroJestor("reserva", reservaSalva.id.toString(), errorMessage);
+  }
+
+  return reservaSalva;
 }
 
 
+/**
+ * Salva ou atualiza um hóspede no banco de dados e tenta sincronizá-lo com o Jestor.
+ * 
+ * @param hospede - Dados detalhados do hóspede a serem salvos ou atualizados.
+ * @param reservaId - ID da reserva associada ao hóspede.
+ * @returns O hóspede salvo no banco de dados.
+ */
 export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId: number) {
-  // 🔹 Se não houver hóspede, não faz nada e retorna imediatamente
   if (!hospede) return;
 
-  // 🔹 Verifica se o hóspede já existe no banco de dados pelo ID externo (_id)
+  // 🔍 Verifica se o hóspede já existe no banco pelo ID externo
   const hospedeExistente = await prisma.hospede.findUnique({
-    where: { idExterno: hospede._id },
+      where: { idExterno: hospede._id },
   });
 
-  // 🔹 Define se a atualização é necessária comparando os valores existentes com os novos
+  // 🔍 Define se a atualização é necessária comparando os dados existentes com os novos
   const precisaAtualizar =
-    !hospedeExistente || // Se o hóspede não existir, precisa ser criado
-    hospedeExistente.nomeCompleto !== hospede.name || // Se o nome mudou
-    hospedeExistente.email !== hospede.email || // Se o e-mail mudou
-    hospedeExistente.dataDeNascimento !== hospede.birthDate || // Se a data de nascimento mudou
-    hospedeExistente.telefone !== hospede.phones?.[0]?.iso || // Se o telefone principal mudou
-    hospedeExistente.cpf !== hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || // Se o CPF mudou
-    hospedeExistente.documento !== hospede.documents?.find((doc) => doc.type === 'id')?.numb; // Se o documento de identidade mudou
+      !hospedeExistente ||
+      hospedeExistente.nomeCompleto !== hospede.name ||
+      hospedeExistente.email !== hospede.email ||
+      hospedeExistente.dataDeNascimento !== hospede.birthDate ||
+      hospedeExistente.telefone !== hospede.phones?.[0]?.iso ||
+      hospedeExistente.cpf !== hospede.documents?.find((doc) => doc.type === 'cpf')?.numb ||
+      hospedeExistente.documento !== hospede.documents?.find((doc) => doc.type === 'id')?.numb;
 
-  // 🔹 Faz um upsert (atualiza ou insere) do hóspede no banco
-  await prisma.hospede.upsert({
-    where: { idExterno: hospede._id }, // Busca pelo ID externo
-    update: {
-      nomeCompleto: hospede.name, // Atualiza o nome do hóspede
-      email: hospede.email, // Atualiza o e-mail
-      dataDeNascimento: hospede.birthDate || null, // Atualiza a data de nascimento
-      telefone: hospede.phones?.[0]?.iso || null, // Atualiza o telefone principal
-      cpf: hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || null, // Atualiza o CPF se existir
-      documento: hospede.documents?.find((doc) => doc.type === 'id')?.numb || null, // Atualiza o documento de identidade se existir
-      reservaId, // Associa o hóspede à reserva correta
-      sincronizadoNoJestor: precisaAtualizar ? false : hospedeExistente?.sincronizadoNoJestor, // Só marca como "não sincronizado" se os dados mudarem
-    },
-    create: {
-      idExterno: hospede._id, // Cria um novo hóspede com o ID externo da Stays
-      nomeCompleto: hospede.name, // Nome completo
-      email: hospede.email, // E-mail
-      dataDeNascimento: hospede.birthDate || null, // Data de nascimento
-      telefone: hospede.phones?.[0]?.iso || null, // Telefone principal
-      cpf: hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || null, // CPF se existir
-      documento: hospede.documents?.find((doc) => doc.type === 'id')?.numb || null, // Documento de identidade se existir
-      reservaId, // Relaciona o hóspede com a reserva correspondente
-      sincronizadoNoJestor: false, // Como é um novo hóspede, ele ainda não foi sincronizado com o Jestor
-    },
+  // 🚀 Realiza o upsert do hóspede no banco de dados
+  const hospedeSalvo = await prisma.hospede.upsert({
+      where: { idExterno: hospede._id },
+      update: {
+          nomeCompleto: hospede.name,
+          email: hospede.email,
+          dataDeNascimento: hospede.birthDate || null,
+          telefone: hospede.phones?.[0]?.iso || null,
+          cpf: hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || null,
+          documento: hospede.documents?.find((doc) => doc.type === 'id')?.numb || null,
+          reservaId,
+          sincronizadoNoJestor: precisaAtualizar ? false : hospedeExistente?.sincronizadoNoJestor,
+      },
+      create: {
+          idExterno: hospede._id,
+          nomeCompleto: hospede.name,
+          email: hospede.email,
+          dataDeNascimento: hospede.birthDate || null,
+          telefone: hospede.phones?.[0]?.iso || null,
+          cpf: hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || null,
+          documento: hospede.documents?.find((doc) => doc.type === 'id')?.numb || null,
+          reservaId,
+          sincronizadoNoJestor: false,
+      },
   });
+
+  try {
+      // 🚀 Tenta sincronizar o hóspede com o Jestor imediatamente após salvar no banco
+      await sincronizarHospede(hospedeSalvo);
+
+      // ✅ Atualiza o campo `sincronizadoNoJestor` caso a sincronização seja bem-sucedida
+      await prisma.hospede.update({
+          where: { id: hospedeSalvo.id },
+          data: { sincronizadoNoJestor: true },
+      });
+
+  } catch (error: any) {
+      const errorMessage = error.message || 'Erro desconhecido';
+
+      logDebug('Erro', `❌ Erro ao sincronizar hóspede ${hospedeSalvo.nomeCompleto} com Jestor: ${errorMessage}`);
+      
+      // 🔥 Salva o erro na tabela ErroSincronizacao
+      await registrarErroJestor('hospede', hospedeSalvo.id.toString(), errorMessage);
+  }
+
+  return hospedeSalvo;
 }
 
 
 
+/**
+ * Salva ou atualiza um imóvel no banco de dados e tenta sincronizá-lo com o Jestor.
+ * 
+ * @param imovel - Dados detalhados do imóvel a serem salvos ou atualizados.
+ * @returns O imóvel salvo no banco de dados.
+ */
 export async function salvarImovel(imovel: ImovelDetalhado) {
   // 🔹 Verifica se o imóvel já existe no banco pelo ID externo (_id)
   const imovelExistente = await prisma.imovel.findUnique({
     where: { idExterno: imovel._id },
   });
 
-  // 🔹 Verifica se há um proprietário associado ao imóvel e salva antes de continuar
+  // 🔹 Salva o proprietário, se existir
   let proprietarioId: number | null = null;
   if (imovel.owner) {
     proprietarioId = await salvarProprietario(imovel.owner.nome, imovel.owner.telefone);
@@ -124,145 +159,242 @@ export async function salvarImovel(imovel: ImovelDetalhado) {
 
   // 🔹 Define se a atualização é necessária comparando os valores existentes com os novos
   const precisaAtualizar =
-    !imovelExistente || // Se o imóvel não existir, precisa ser criado
-    imovelExistente.idStays !== imovel.id || // Se o ID interno da Stays mudou
-    imovelExistente.sku !== imovel.internalName || // Se o SKU (nome interno) mudou
-    imovelExistente.status !== imovel.status || // Se o status do imóvel mudou
-    imovelExistente.idCondominioStays !== imovel._idproperty || // Se o ID do condomínio mudou
-    imovelExistente.proprietarioId !== proprietarioId; // Se o proprietário mudou
+    !imovelExistente || 
+    imovelExistente.idStays !== imovel.id || 
+    imovelExistente.sku !== imovel.internalName || 
+    imovelExistente.status !== imovel.status || 
+    imovelExistente.idCondominioStays !== imovel._idproperty || 
+    imovelExistente.proprietarioId !== proprietarioId;
 
-  // 🔹 Faz um upsert (atualiza ou insere) do imóvel no banco
-  return await prisma.imovel.upsert({
-    where: { idExterno: imovel._id }, // Busca pelo ID externo
+  // 🔹 Realiza o upsert do imóvel no banco de dados
+  const imovelSalvo = await prisma.imovel.upsert({
+    where: { idExterno: imovel._id },
     update: {
-      idStays: imovel.id, // Atualiza o ID interno da Stays
-      sku: imovel.internalName, // Atualiza o SKU (nome interno)
-      status: imovel.status, // Atualiza o status do imóvel
-      idCondominioStays: imovel._idproperty || null, // Atualiza o ID externo do condomínio relacionado
-      proprietarioId, // 🔗 Atualiza o relacionamento com o proprietário
-      sincronizadoNoJestor: precisaAtualizar ? false : imovelExistente?.sincronizadoNoJestor, // Marca como "não sincronizado" apenas se os dados mudarem
+      idStays: imovel.id,
+      sku: imovel.internalName,
+      status: imovel.status,
+      idCondominioStays: imovel._idproperty || null,
+      proprietarioId,
+      sincronizadoNoJestor: precisaAtualizar ? false : imovelExistente?.sincronizadoNoJestor,
     },
     create: {
-      idExterno: imovel._id, // Cria um novo imóvel com o ID externo da Stays
-      idStays: imovel.id, // Preenche o ID interno da Stays
-      sku: imovel.internalName, // Preenche o SKU (nome interno)
-      status: imovel.status, // Preenche o status do imóvel
-      idCondominioStays: imovel._idproperty || null, // Preenche o ID externo do condomínio relacionado
-      proprietarioId, // 🔗 Relaciona o imóvel com o proprietário salvo
-      sincronizadoNoJestor: false, // Como é um novo imóvel, ele ainda não foi sincronizado com o Jestor
+      idExterno: imovel._id,
+      idStays: imovel.id,
+      sku: imovel.internalName,
+      status: imovel.status,
+      idCondominioStays: imovel._idproperty || null,
+      proprietarioId,
+      sincronizadoNoJestor: false,
     },
   });
+
+  try {
+    // 🚀 Tenta sincronizar o imóvel com o Jestor imediatamente após salvar no banco
+    await sincronizarImovel(imovelSalvo);
+
+    // ✅ Atualiza o campo `sincronizadoNoJestor` caso a sincronização seja bem-sucedida
+    await prisma.imovel.update({
+      where: { id: imovelSalvo.id },
+      data: { sincronizadoNoJestor: true },
+    });
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Erro desconhecido';
+
+    logDebug('Erro', `❌ Erro ao sincronizar imóvel ${imovelSalvo.idExterno} com Jestor: ${errorMessage}`);
+    
+    // 🔥 Salva o erro na tabela ErroSincronizacao
+    await registrarErroJestor('imovel', imovelSalvo.id.toString(), errorMessage);
+  }
+
+  return imovelSalvo;
 }
 
-
-
-
+/**
+ * Salva ou atualiza um condomínio no banco de dados e tenta sincronizá-lo com o Jestor.
+ * 
+ * @param condominio - Dados detalhados do condomínio a serem salvos ou atualizados.
+ * @returns O condomínio salvo no banco de dados.
+ */
 export async function salvarCondominio(condominio: CondominioDetalhado) {
-  // 🔹 Verifica se o condomínio já existe no banco pelo ID externo (_id)
+  // 🔍 Verifica se o condomínio já existe no banco pelo ID externo
   const condominioExistente = await prisma.condominio.findUnique({
     where: { idExterno: condominio._id },
   });
 
-  // 🔹 Define se a atualização é necessária comparando os valores existentes com os novos
+  // 🔍 Define se a atualização é necessária comparando os dados existentes com os novos
   const precisaAtualizar =
-    !condominioExistente || // Se o condomínio não existir, precisa ser criado
-    condominioExistente.idStays !== condominio.id || // Se o ID interno da Stays mudou
-    condominioExistente.sku !== condominio.internalName || // Se o SKU (nome interno) mudou
-    condominioExistente.regiao !== condominio.regiao; // Se a região mudou
+    !condominioExistente ||
+    condominioExistente.idStays !== condominio.id ||
+    condominioExistente.sku !== condominio.internalName ||
+    condominioExistente.regiao !== condominio.regiao;
 
-  // 🔹 Faz um upsert (atualiza ou insere) do condomínio no banco de dados
-  return await prisma.condominio.upsert({
-    where: { idExterno: condominio._id }, // Busca pelo ID externo (_id)
+  // 🚀 Realiza o upsert do condomínio no banco de dados
+  const condominioSalvo = await prisma.condominio.upsert({
+    where: { idExterno: condominio._id },
     update: {
-      idStays: condominio.id, // Atualiza o ID interno da Stays
-      sku: condominio.internalName, // Atualiza o SKU (nome interno)
-      regiao: condominio.regiao, // Atualiza a região do condomínio
-      sincronizadoNoJestor: precisaAtualizar ? false : condominioExistente?.sincronizadoNoJestor, // Marca como "não sincronizado" apenas se houve atualização nos dados
+      idStays: condominio.id,
+      sku: condominio.internalName,
+      regiao: condominio.regiao,
+      sincronizadoNoJestor: precisaAtualizar ? false : condominioExistente?.sincronizadoNoJestor,
     },
     create: {
-      idExterno: condominio._id, // Cria um novo condomínio com o ID externo da Stays
-      idStays: condominio.id, // ID interno da Stays
-      sku: condominio.internalName, // Nome interno do condomínio
-      regiao: condominio.regiao, // Região do condomínio
-      sincronizadoNoJestor: false, // Como é um novo registro, ele ainda não foi sincronizado com o Jestor
+      idExterno: condominio._id,
+      idStays: condominio.id,
+      sku: condominio.internalName,
+      regiao: condominio.regiao,
+      sincronizadoNoJestor: false,
     },
   });
+
+  try {
+    // 🚀 Tenta sincronizar o condomínio com o Jestor imediatamente após salvar no banco
+    await sincronizarCondominio(condominioSalvo);
+
+    // ✅ Atualiza o campo `sincronizadoNoJestor` caso a sincronização seja bem-sucedida
+    await prisma.condominio.update({
+      where: { id: condominioSalvo.id },
+      data: { sincronizadoNoJestor: true },
+    });
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Erro desconhecido';
+
+    logDebug('Erro', `❌ Erro ao sincronizar condomínio ${condominioSalvo.idExterno} com Jestor: ${errorMessage}`);
+    
+    // 🔥 Salva o erro na tabela ErroSincronizacao
+    await registrarErroJestor('condominio', condominioSalvo.id.toString(), errorMessage);
+  }
+
+  return condominioSalvo;
 }
 
 
+/**
+ * Salva ou atualiza as taxas de reserva no banco de dados e tenta sincronizá-las com o Jestor.
+ * 
+ * @param taxas - Array de taxas detalhadas a serem salvas ou atualizadas.
+ */
 export async function salvarTaxasReserva(taxas: TaxaReservaDetalhada[]) {
-  try {
-    // 🔹 Percorre todas as taxas recebidas
-    for (const taxa of taxas) {
-      
-      // 🔹 Se a taxa não tiver um nome válido, ela é ignorada para evitar erros no banco de dados
+  for (const taxa of taxas) {
+    try {
+      // 🔍 Valida se a taxa possui um nome válido
       if (!taxa.name || typeof taxa.name !== 'string') {
-        console.warn(`Taxa inválida encontrada: ${JSON.stringify(taxa)}`);
-        continue; // Pula para a próxima taxa sem tentar salvar a inválida
+        logDebug('Aviso', `⚠️ Taxa inválida encontrada: ${JSON.stringify(taxa)}`);
+        continue;
       }
 
-      // 🔹 Verifica se a taxa já existe no banco de dados, identificando pela combinação reservaId + name (chave única)
+      // 🔍 Verifica se a taxa já existe no banco de dados pelo par (reservaId, name)
       const taxaExistente = await prisma.taxaReserva.findUnique({
         where: { reservaId_name: { reservaId: taxa.reservaId, name: taxa.name } },
       });
 
-      // 🔹 Define se a atualização é necessária comparando o valor da taxa no banco com o novo valor recebido
+      // 🔍 Define se a atualização é necessária comparando os valores existentes com os novos
       const precisaAtualizar = !taxaExistente || taxaExistente.valor !== taxa.valor;
 
-      // 🔹 Faz um upsert (atualiza se já existir, insere se não existir) da taxa de reserva
-      await prisma.taxaReserva.upsert({
-        where: { reservaId_name: { reservaId: taxa.reservaId, name: taxa.name } }, // Chave única
+      // 🚀 Realiza o upsert da taxa no banco de dados
+      const taxaSalva = await prisma.taxaReserva.upsert({
+        where: { reservaId_name: { reservaId: taxa.reservaId, name: taxa.name } },
         update: {
-          valor: taxa.valor, // Atualiza o valor da taxa caso necessário
-          sincronizadoNoJestor: precisaAtualizar ? false : taxaExistente?.sincronizadoNoJestor, 
-          // 🔹 Se a taxa foi modificada, marca `sincronizadoNoJestor = false` para indicar que precisa ser sincronizada
-          // 🔹 Caso contrário, mantém o valor atual de `sincronizadoNoJestor`
+          valor: taxa.valor,
+          sincronizadoNoJestor: precisaAtualizar ? false : taxaExistente?.sincronizadoNoJestor,
         },
         create: {
-          reservaId: taxa.reservaId, // Associa a taxa à reserva correta
-          name: taxa.name, // Nome da taxa (ex.: "Taxa de Limpeza", "Taxa de Serviço")
-          valor: taxa.valor, // Valor da taxa
-          sincronizadoNoJestor: false, // Como é uma nova taxa, ainda não foi sincronizada com o Jestor
+          reservaId: taxa.reservaId,
+          name: taxa.name,
+          valor: taxa.valor,
+          sincronizadoNoJestor: false,
         },
       });
+
+      // 🚀 Tenta sincronizar a taxa com o Jestor
+      await sincronizarTaxaReserva(taxaSalva);
+
+      // ✅ Atualiza o campo `sincronizadoNoJestor` caso a sincronização seja bem-sucedida
+      await prisma.taxaReserva.update({
+        where: { id: taxaSalva.id },
+        data: { sincronizadoNoJestor: true },
+      });
+
+    } catch (error: any) {
+      const errorMessage = error.message || 'Erro desconhecido';
+
+      logDebug('Erro', `❌ Erro ao sincronizar taxa ${taxa.name} da reserva ${taxa.reservaId} com o Jestor: ${errorMessage}`);
+      
+      // 🔥 Salva o erro na tabela ErroSincronizacao
+      await registrarErroJestor('taxaReserva', taxa.reservaId.toString(), errorMessage);
+      
+      // ⚠️ Define o campo `sincronizadoNoJestor` como `false` para futuras tentativas
+      await prisma.taxaReserva.update({
+        where: { reservaId_name: { reservaId: taxa.reservaId, name: taxa.name } },
+        data: { sincronizadoNoJestor: false },
+      });
     }
-  } catch (error) {
-    // 🔹 Captura qualquer erro que ocorra no processo e exibe no console
-    console.error('Erro ao salvar taxas de reserva:', error);
-    throw new Error('Não foi possível salvar as taxas de reserva.');
   }
 }
 
-export async function salvarProprietario(nome: string, telefone?: string) {
-  // 🔹 Verifica se o proprietário já existe no banco pelo nome e telefone
+/**
+ * Salva ou atualiza um proprietário no banco de dados e tenta sincronizá-lo com o Jestor.
+ * 
+ * @param nome - Nome do proprietário a ser salvo ou atualizado.
+ * @param telefone - Telefone do proprietário (opcional).
+ * @returns O ID do proprietário salvo no banco de dados.
+ */
+export async function salvarProprietario(nome: string, telefone?: string): Promise<number> {
+  // 🔍 Verifica se o proprietário já existe no banco pelo nome e telefone
   const proprietarioExistente = await prisma.proprietario.findFirst({
     where: { nome, telefone },
   });
 
-  // 🔹 Define se a atualização é necessária comparando os valores existentes com os novos
+  // 🔍 Define se a atualização é necessária comparando os dados existentes com os novos
   const precisaAtualizar =
-    !proprietarioExistente || // Se o proprietário não existir, precisa ser criado
-    proprietarioExistente.nome !== nome || // Se o nome mudou
-    proprietarioExistente.telefone !== telefone; // Se o telefone mudou
+    !proprietarioExistente ||
+    proprietarioExistente.nome !== nome ||
+    proprietarioExistente.telefone !== telefone;
 
-  // 🔹 Faz um upsert (atualiza ou insere) do proprietário no banco
-  const proprietario = await prisma.proprietario.upsert({
-    where: { id: proprietarioExistente?.id || 0 }, // Usa ID se existir, senão força um ID inválido
+  // 🚀 Realiza o upsert do proprietário no banco de dados
+  const proprietarioSalvo = await prisma.proprietario.upsert({
+    where: { id: proprietarioExistente?.id || 0 },
     update: {
-      nome, // Atualiza o nome do proprietário
-      telefone: telefone || null, // Atualiza o telefone ou mantém null
-      sincronizadoNoJestor: precisaAtualizar ? false : proprietarioExistente?.sincronizadoNoJestor, // Mantém o sincronizadoNoJestor apenas se não houver mudanças
+      nome,
+      telefone: telefone || null,
+      sincronizadoNoJestor: precisaAtualizar ? false : proprietarioExistente?.sincronizadoNoJestor,
     },
     create: {
-      nome, // Cria um novo proprietário com o nome
-      telefone: telefone || null, // Cria com o telefone ou null
-      sincronizadoNoJestor: false, // Como é um novo proprietário, ainda não foi sincronizado com o Jestor
+      nome,
+      telefone: telefone || null,
+      sincronizadoNoJestor: false,
     },
   });
 
-  return proprietario.id; // Retorna o ID do proprietário salvo
+  try {
+    // 🚀 Tenta sincronizar o proprietário com o Jestor imediatamente após salvar no banco
+    await sincronizarProprietario(proprietarioSalvo);
+
+    // ✅ Atualiza o campo `sincronizadoNoJestor` caso a sincronização seja bem-sucedida
+    await prisma.proprietario.update({
+      where: { id: proprietarioSalvo.id },
+      data: { sincronizadoNoJestor: true },
+    });
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Erro desconhecido';
+
+    logDebug('Erro', `❌ Erro ao sincronizar proprietário ${proprietarioSalvo.nome} com Jestor: ${errorMessage}`);
+    
+    // 🔥 Salva o erro na tabela ErroSincronizacao
+    await registrarErroJestor('proprietario', proprietarioSalvo.id.toString(), errorMessage);
+  }
+
+  return proprietarioSalvo.id;
 }
 
+/**
+ * Salva ou atualiza um bloqueio no banco de dados e tenta sincronizá-lo com o Jestor.
+ * 
+ * @param bloqueio - Dados detalhados do bloqueio a serem salvos ou atualizados.
+ * @returns O bloqueio salvo no banco de dados.
+ */
 export async function salvarBloqueio(bloqueio: BloqueioDetalhado) {
   try {
     console.log(`📌 Salvando bloqueio: ${bloqueio._id}`);
@@ -272,72 +404,185 @@ export async function salvarBloqueio(bloqueio: BloqueioDetalhado) {
       where: { idExterno: bloqueio._id },
     });
 
-    /**
-     * 🔹 Determina se o bloqueio precisa ser atualizado.
-     *
-     * O critério para atualizar é:
-     * 1️⃣ Se `bloqueioExistente` for `null`, significa que o bloqueio não existe → Precisa ser criado.
-     * 2️⃣ Se `bloqueioExistente` existir, compararmos os campos relevantes:
-     *     - Se algum campo importante mudou, então precisa ser atualizado.
-     */
+    // 🔹 Define se a atualização é necessária comparando os valores existentes com os novos
     const precisaAtualizar =
-      !bloqueioExistente || // Bloqueio não existe? Então precisa ser salvo.
+      !bloqueioExistente ||
       bloqueioExistente.localizador !== bloqueio.name ||
       bloqueioExistente.checkIn !== bloqueio.checkIn ||
       bloqueioExistente.checkOut !== bloqueio.checkOut ||
       bloqueioExistente.horaCheckIn !== (bloqueio.horaCheckIn ?? null) ||
       bloqueioExistente.horaCheckOut !== (bloqueio.horaCheckOut ?? null) ||
-      bloqueioExistente.notaInterna !== (bloqueio.notaInterna || "Sem nota interna") ||
+      bloqueioExistente.notaInterna !== (bloqueio.notaInterna || 'Sem nota interna') ||
       bloqueioExistente.imovelId !== (bloqueio.imovelId ?? null);
 
-    /**
-     * 🔹 Realiza um `upsert` para criar ou atualizar o bloqueio.
-     *
-     * `upsert`: Se o bloqueio já existir, atualiza; se não existir, cria.
-     */
-    return await prisma.bloqueio.upsert({
-      where: { idExterno: bloqueio._id }, // 🔍 Usa o ID externo como identificador único.
-
-      // 🔄 Atualiza o bloqueio se ele já existir
+    // 🔹 Realiza o upsert do bloqueio no banco de dados
+    const bloqueioSalvo = await prisma.bloqueio.upsert({
+      where: { idExterno: bloqueio._id },
       update: {
-        localizador: bloqueio.name, // Atualiza o nome (identificador do bloqueio)
-        checkIn: bloqueio.checkIn, // Atualiza a data de check-in
-        checkOut: bloqueio.checkOut, // Atualiza a data de check-out
-        horaCheckIn: bloqueio.horaCheckIn ?? null, // Atualiza a hora de check-in (se houver)
-        horaCheckOut: bloqueio.horaCheckOut ?? null, // Atualiza a hora de check-out (se houver)
-        notaInterna: bloqueio.notaInterna || "Sem nota interna", // Atualiza a nota interna
-        imovelId: bloqueio.imovelId ?? null, // Atualiza o ID do imóvel relacionado
-
-        /**
-         * 🔹 Atualiza o campo `sincronizadoNoJestor`
-         *
-         * - Se o bloqueio precisa ser atualizado (`precisaAtualizar === true`), então define como `false` (ainda não sincronizado).
-         * - Se o bloqueio não mudou (`precisaAtualizar === false`), mantém o valor original do banco (`bloqueioExistente?.sincronizadoNoJestor`).
-         */
+        localizador: bloqueio.name,
+        checkIn: bloqueio.checkIn,
+        checkOut: bloqueio.checkOut,
+        horaCheckIn: bloqueio.horaCheckIn ?? null,
+        horaCheckOut: bloqueio.horaCheckOut ?? null,
+        notaInterna: bloqueio.notaInterna || 'Sem nota interna',
+        imovelId: bloqueio.imovelId ?? null,
         sincronizadoNoJestor: precisaAtualizar ? false : bloqueioExistente?.sincronizadoNoJestor,
       },
-
-      // 🆕 Se o bloqueio ainda não existir, cria um novo registro
       create: {
-        idExterno: bloqueio._id, // Cria um novo bloqueio com o ID externo da Stays
-        localizador: bloqueio.name, // Define o identificador do bloqueio
-        checkIn: bloqueio.checkIn, // Define a data de check-in
-        checkOut: bloqueio.checkOut, // Define a data de check-out
-        horaCheckIn: bloqueio.horaCheckIn ?? null, // Define a hora de check-in (se houver)
-        horaCheckOut: bloqueio.horaCheckOut ?? null, // Define a hora de check-out (se houver)
-        notaInterna: bloqueio.notaInterna || "Sem nota interna", // Define a nota interna
-        imovelId: bloqueio.imovelId ?? null, // Associa o bloqueio a um imóvel (ou `null` se não existir)
-
-        /**
-         * 🔹 Sempre define `sincronizadoNoJestor = false` ao criar um novo bloqueio.
-         * Isso garante que novos bloqueios sejam sincronizados posteriormente.
-         */
+        idExterno: bloqueio._id,
+        localizador: bloqueio.name,
+        checkIn: bloqueio.checkIn,
+        checkOut: bloqueio.checkOut,
+        horaCheckIn: bloqueio.horaCheckIn ?? null,
+        horaCheckOut: bloqueio.horaCheckOut ?? null,
+        notaInterna: bloqueio.notaInterna || 'Sem nota interna',
+        imovelId: bloqueio.imovelId ?? null,
         sincronizadoNoJestor: false,
       },
     });
-  } catch (error) {
-    console.error("❌ Erro ao salvar bloqueio:", error);
-    throw new Error("Erro ao salvar bloqueio."); // Lança um erro para tratamento externo
+
+    try {
+      // 🚀 Tenta sincronizar o bloqueio com o Jestor
+      await sincronizarBloqueio(bloqueioSalvo);
+
+      // ✅ Atualiza o campo `sincronizadoNoJestor` se a sincronização for bem-sucedida
+      await prisma.bloqueio.update({
+        where: { id: bloqueioSalvo.id },
+        data: { sincronizadoNoJestor: true },
+      });
+    } catch (error: any) {
+      const errorMessage = error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao sincronizar bloqueio ${bloqueioSalvo.idExterno} com Jestor: ${errorMessage}`);
+      await registrarErroJestor('bloqueio', bloqueioSalvo.id.toString(), errorMessage);
+    }
+
+    return bloqueioSalvo;
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Erro desconhecido';
+    logDebug('Erro', `❌ Erro ao salvar bloqueio ${bloqueio._id}: ${errorMessage}`);
+    throw new Error('Erro ao salvar bloqueio');
   }
 }
 
+/**
+ * Salva ou atualiza um canal no banco de dados e tenta sincronizá-lo com o Jestor.
+ * 
+ * @param canal - Dados detalhados do canal a serem salvos ou atualizados.
+ * @returns O ID do canal salvo no banco de dados.
+ */
+export async function salvarCanal(canal: CanalDetalhado): Promise<number> {
+  try {
+      // 🔍 Verifica se o canal já existe no banco pelo ID externo (_id)
+      const canalExistente = await prisma.canal.findUnique({
+          where: { idExterno: canal._id },
+      });
+
+      // 🔍 Define se a atualização é necessária comparando os dados existentes com os novos
+      const precisaAtualizar = 
+          !canalExistente || 
+          canalExistente.titulo !== canal.titulo;
+
+      // 🚀 Realiza o upsert do canal no banco de dados
+      const canalSalvo = await prisma.canal.upsert({
+          where: { idExterno: canal._id },
+          update: {
+              titulo: canal.titulo,
+              sincronizadoNoJestor: precisaAtualizar ? false : canalExistente?.sincronizadoNoJestor,
+          },
+          create: {
+              idExterno: canal._id,
+              titulo: canal.titulo,
+              sincronizadoNoJestor: false,
+          },
+      });
+
+      try {
+          // 🚀 Tenta sincronizar o canal com o Jestor imediatamente após salvar no banco
+          await sincronizarCanal({
+              id: canalSalvo.id,
+              idExterno: canalSalvo.idExterno,
+              titulo: canalSalvo.titulo,
+          });
+
+          // ✅ Atualiza o campo `sincronizadoNoJestor` caso a sincronização seja bem-sucedida
+          await prisma.canal.update({
+              where: { id: canalSalvo.id },
+              data: { sincronizadoNoJestor: true },
+          });
+
+      } catch (error: any) {
+          const errorMessage = error.message || 'Erro desconhecido';
+          logDebug('Erro', `❌ Erro ao sincronizar canal ${canalSalvo.titulo} com Jestor: ${errorMessage}`);
+          await registrarErroJestor('canal', canalSalvo.id.toString(), errorMessage);
+      }
+
+      return canalSalvo.id;
+
+  } catch (error: any) {
+      const errorMessage = error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao salvar canal ${canal._id}: ${errorMessage}`);
+      throw new Error('Erro ao salvar canal');
+  }
+}
+
+/**
+ * Salva ou atualiza um agente no banco de dados e tenta sincronizá-lo com o Jestor.
+ * 
+ * @param agente - Dados detalhados do agente a serem salvos ou atualizados.
+ * @returns O ID do agente salvo no banco de dados.
+ */
+export async function salvarAgente(agente: AgenteDetalhado): Promise<number> {
+  try {
+      // 🔍 Verifica se o agente já existe no banco pelo ID externo (_id)
+      const agenteExistente = await prisma.agente.findUnique({
+          where: { idExterno: agente._id },
+      });
+
+      // 🔍 Define se a atualização é necessária comparando os dados existentes com os novos
+      const precisaAtualizar = 
+          !agenteExistente || 
+          agenteExistente.nome !== agente.name;
+
+      // 🚀 Realiza o upsert do agente no banco de dados
+      const agenteSalvo = await prisma.agente.upsert({
+          where: { idExterno: agente._id },
+          update: {
+              nome: agente.name,
+              sincronizadoNoJestor: precisaAtualizar ? false : agenteExistente?.sincronizadoNoJestor,
+          },
+          create: {
+              idExterno: agente._id,
+              nome: agente.name,
+              sincronizadoNoJestor: false,
+          },
+      });
+
+      try {
+          // 🚀 Tenta sincronizar o agente com o Jestor imediatamente após salvar no banco
+          await sincronizarAgente({
+              id: agenteSalvo.id,
+              idExterno: agenteSalvo.idExterno,
+              nome: agenteSalvo.nome,
+          });
+
+          // ✅ Atualiza o campo `sincronizadoNoJestor` caso a sincronização seja bem-sucedida
+          await prisma.agente.update({
+              where: { id: agenteSalvo.id },
+              data: { sincronizadoNoJestor: true },
+          });
+
+      } catch (error: any) {
+          const errorMessage = error.message || 'Erro desconhecido';
+          logDebug('Erro', `❌ Erro ao sincronizar agente ${agenteSalvo.nome} com Jestor: ${errorMessage}`);
+          await registrarErroJestor('agente', agenteSalvo.id.toString(), errorMessage);
+      }
+
+      return agenteSalvo.id;
+
+  } catch (error: any) {
+      const errorMessage = error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao salvar agente ${agente._id}: ${errorMessage}`);
+      throw new Error('Erro ao salvar agente');
+  }
+}

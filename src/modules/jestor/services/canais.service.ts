@@ -1,112 +1,127 @@
+// Canal
+
 import jestorClient from '../../../config/jestorClient';
-import { typeCanal } from '../jestor.types';
+import { typeCanal } from '../jestor.types'; 
 import { atualizaCampoSincronizadoNoJestor, getCanaisNaoSincronizados } from '../../database/models';
+import { registrarErroJestor } from '../../database/erro.service';
+import prisma from '../../../config/database';
+import { logDebug } from '../../../utils/logger';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
+const ENDPOINT_UPDATE = '/object/update';
 const JESTOR_TB_CANAL = '1gr5oeddpkkkxjula510g';
 
 /**
- * Verifica se um agente com o nome fornecido já existe na tabela do Jestor.
- * @param nome - IdExterno do agente a ser verificado.
- * @returns - Um boolean indicando se o agente já existe no Jestor.
+ * Consulta o Jestor para verificar se o canal existe e, se sim, retorna o ID interno.
+ * @param idExterno - O ID externo do canal.
+ * @returns - O ID interno do Jestor ou null se o canal não existir.
  */
-
-export async function verificarCanalNoJestor(nome: string) {
+export async function obterIdInternoCanalNoJestor(idExterno: string) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_TB_CANAL, // ID da tabela no Jestor
-            filters: [
-                {
-                    field: 'idexterno', // Nome do campo no Jestor
-                    value: nome,
-                    operator: '==', // Operador para comparação
-                },
-            ],
+            object_type: JESTOR_TB_CANAL,
+            filters: [{ field: 'idexterno', value: idExterno, operator: '==' }],
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
-        console.log("--------------------------------------------------");
-        */
-        // Garante que items está definido antes de verificar o tamanho
+
         const items = response.data?.data?.items;
 
         if (Array.isArray(items) && items.length > 0) {
-            return true; // Canal existe
+            return items[0][`id_${JESTOR_TB_CANAL}`] ?? null;
         }
 
-        return false; // Canal não existe
+        return null;
+
     } catch (error: any) {
-        console.error('Erro ao verificar Canal no Jestor:', error.message);
-        throw new Error('Erro ao verificar Canal no Jestor');
+        const errorMessage = error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao buscar canal no Jestor: ${errorMessage}`);
+        throw new Error('Erro ao buscar canal no Jestor');
     }
 }
 
 /**
- * Insere um Canal no Jestor.
- * @param Canal - Dados do Canal a serem inseridos.
+ * Insere um canal no Jestor.
+ * @param canal - Dados do canal a serem inseridos.
  */
 export async function inserirCanalNoJestor(canal: typeCanal) {
-
     try {
-        // nome do campo no Jestor | nome do campo no banco de dados local
-        const data: any = {
+        const data: Record<string, any> = {
             idbdapi: canal.id,
             idexterno: canal.idExterno,
             titulo: canal.titulo,
-        }
+        };
 
-        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_TB_CANAL, // ID da tabela no Jestor
+            object_type: JESTOR_TB_CANAL,
             data,
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Canal inserido no Jestor:\n\n', response.data);
-        console.log("--------------------------------------------------");
-        */
-        return response.data; // Retorna o dado inserido
+
+        logDebug('Canal', `✅ Canal ${canal.idExterno} inserido com sucesso no Jestor!`);
+
+        return response.data;
 
     } catch (error: any) {
-        console.error('Erro ao inserir Canal no Jestor:', error.response?.data || error.message);
-        throw new Error('Erro ao inserir Canal no Jestor');
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao inserir canal ${canal.idExterno} no Jestor: ${errorMessage}`);
+        await registrarErroJestor('canal', canal.idExterno, errorMessage);
+        throw new Error(`Erro ao inserir canal ${canal.idExterno} no Jestor`);
     }
 }
 
 /**
- * Sincroniza os Canals não sincronizados do banco local com o Jestor.
+ * Atualiza um canal existente no Jestor.
+ * @param canal - Dados do canal a serem atualizados.
+ * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function sincronizarCanal() {
+export async function atualizarCanalNoJestor(canal: typeCanal, idInterno: string) {
     try {
-        const canaisNaoSincronizados = await getCanaisNaoSincronizados();
-        
-        if(canaisNaoSincronizados){
-            for (const canal of canaisNaoSincronizados) {
-                const existeNoJestor = await verificarCanalNoJestor(canal.idExterno);
-
-                if (!existeNoJestor) {
-                    await inserirCanalNoJestor(canal);
-                    console.log("--------------------------------------------------");
-                    console.log(`Canal ${canal.idExterno}\nSincronizado com sucesso!`);
-                    
-                } else {
-                    console.log("--------------------------------------------------");
-                    console.log(`Canal: ${canal.idExterno}\nJa existe no Jestor. Atualizado no banco local.`);
-                    
-                }
-                // Atualiza o status no banco local para sincronizado
-                await atualizaCampoSincronizadoNoJestor('canal', canal.idExterno);
+        const data: Record<string, any> = {
+            object_type: JESTOR_TB_CANAL,
+            data: {
+                [`id_${JESTOR_TB_CANAL}`]: idInterno,
+                titulo: canal.titulo,
             }
-        }
+        };
+
+        const response = await jestorClient.post(ENDPOINT_UPDATE, data);
+
+        logDebug('Canal', `🔹 Canal ${canal.idExterno} atualizado com sucesso no Jestor!`);
+
+        return response.data;
+
     } catch (error: any) {
-        console.error('Erro ao sincronizar Canais:', error.message);
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        logDebug('Erro', `❌ Erro ao atualizar canal ${canal.idExterno} no Jestor: ${errorMessage}`);
+        await registrarErroJestor('canal', canal.idExterno, errorMessage);
+        throw new Error(`Erro ao atualizar canal ${canal.idExterno} no Jestor`);
     }
 }
 
-/*funcao de teste
-(async () => {
-  await sincronizarCanal();
-})();
-*/
+/**
+ * Sincroniza apenas UM canal específico com o Jestor.
+ */
+export async function sincronizarCanal(canal: typeCanal) {
+    try {
+        const idInterno = await obterIdInternoCanalNoJestor(canal.idExterno);
+
+        if (!idInterno) {
+            await inserirCanalNoJestor(canal);
+        } else {
+            await atualizarCanalNoJestor(canal, idInterno);
+        }
+
+        await atualizaCampoSincronizadoNoJestor('canal', canal.idExterno);
+
+    } catch (error: any) {
+        const errorMessage = error.message || 'Erro desconhecido';
+
+        logDebug('Erro', `❌ Erro ao sincronizar canal ${canal.idExterno}: ${errorMessage}`);
+
+        await prisma.canal.update({
+            where: { idExterno: canal.idExterno },
+            data: { sincronizadoNoJestor: false },
+        });
+
+        throw new Error(`Erro ao sincronizar canal ${canal.idExterno}`);
+    }
+}

@@ -1,53 +1,44 @@
 import jestorClient from '../../../config/jestorClient';
 import { typeReserva } from '../jestor.types'; 
 import { atualizaCampoSincronizadoNoJestor, getReservasNaoSincronizados } from '../../database/models';
+import { registrarErroJestor } from '../../database/erro.service';
+import prisma from '../../../config/database';
+import { logDebug } from '../../../utils/logger';
 
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
+const ENDPOINT_UPDATE = '/object/update';
 const JESTOR_TB_RESERVA = 'e4sqtj0lt_yjxd075da5t';
 
 /**
- * Verifica se uma reserva com o LOCALIZADOR fornecido já existe na tabela do Jestor.
- * @param localizador - Localizador da reserva a ser verificado.
- * @returns - Um boolean indicando se a reserva já existe no Jestor.
+ * Consulta o Jestor para verificar se a reserva existe e, se sim, retorna o ID interno.
+ * 
+ * @param localizador - O localizador da reserva.
+ * @param idExterno - O ID externo da reserva.
+ * @returns - O ID interno do Jestor ou null se a reserva não existir.
  */
-
-export async function verificarReservaNoJestor(
-    localizador: string, 
-    idExterno: string
-) {
+export async function obterIdInternoNoJestor(localizador: string, idExterno: string) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_TB_RESERVA, // ID da tabela no Jestor
+            object_type: JESTOR_TB_RESERVA,
             filters: [
-                {
-                    field: 'name', // localizador
-                    value: localizador,
-                    operator: '==', // Operador para comparação
-                },
-                {
-                    field: 'id_externo',
-                    value: idExterno,
-                    operator: '==',
-                },
+                { field: 'name', value: localizador, operator: '==' },
+                { field: 'id_externo', value: idExterno, operator: '==' },
             ],
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Resposta da API do Jestor:\n\n', JSON.stringify(response.data, null, 2));
-        console.log("--------------------------------------------------");
-        */
-        // Garante que items está definido antes de verificar o tamanho
+
         const items = response.data?.data?.items;
 
         if (Array.isArray(items) && items.length > 0) {
-            return true; // reserva existe
+            const idInterno = items[0][`id_${JESTOR_TB_RESERVA}`];
+            return idInterno ?? null;
         }
 
-        return false; // reserva não existe
+        return null;
+
     } catch (error: any) {
-        console.error('Erro ao verificar reserva no Jestor:', error.message);
-        throw new Error('Erro ao verificar reserva no Jestor');
+        console.error(`❌ Erro ao buscar reserva no Jestor: ${error.message}`);
+        throw new Error('Erro ao buscar reserva no Jestor');
     }
 }
 
@@ -56,10 +47,8 @@ export async function verificarReservaNoJestor(
  * @param reserva - Dados da reserva a serem inseridos.
  */
 export async function inserirReservaNoJestor(reserva: typeReserva) {
-    
     try {
-        // nome do campo no Jestor | nome do campo no banco de dados local
-        const data: any = {
+        const data: Record<string, any> = {
             name: reserva.localizador,
             id_externo: reserva.idExterno,
             data_da_reserva: reserva.dataDaCriacao,
@@ -79,65 +68,105 @@ export async function inserirReservaNoJestor(reserva: typeReserva) {
             quant_diarias: reserva.quantidadeDiarias,
             partnercode: reserva.partnerCode,
             link_stays: reserva.linkStays,
-            id_imovel_stays: reserva.idImovelStays,//idImovelStays = imovelId [?]
-            id_imovel: reserva.imovelId,//nao tem na original
-            canal: reserva.canalId,//canalId = origem [?]
+            id_imovel_stays: reserva.idImovelStays,
             origem: reserva.origem,
             status: reserva.status,
             condominio: reserva.condominio,
             regiao: reserva.regiao,
-            imovel_oficial_sku: reserva.imovelOficialSku,//imovelOficialSku = imovelId [?]
+            imovel_oficial_sku: reserva.imovelOficialSku,
         };
 
-        // Se ImovelId e CanalId forem null, nao adicionamos ao objeto que que sera enviado ao jestor
-        if(reserva.imovelId !== null) data.id_imovel = reserva.imovelId;
-        if(reserva.canalId !== null) data.canal = reserva.canalId;
+        // Adiciona apenas se os IDs estiverem presentes
+        if (reserva.imovelId) data.id_imovel = reserva.imovelId;
+        if (reserva.canalId) data.canal = reserva.canalId;
 
-        // Envia os dados pro Jestor
         const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_TB_RESERVA, // ID da tabela no Jestor
+            object_type: JESTOR_TB_RESERVA,
             data,
         });
-        /* para depuracao
-        console.log("--------------------------------------------------");
-        console.log('Reserva inserida no Jestor:\n\n', response.data);
-        console.log("--------------------------------------------------");
-        */
-        return response.data; // Retorna o dado inserido
-        
+
+        return response.data;
+
     } catch (error: any) {
-        console.error('Erro ao inserir reserva no Jestor:', error?.response?.data || error.message || error);
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        console.error(`❌ Erro ao inserir reserva ${reserva.localizador} no Jestor:`, errorMessage);
+
+        // 🔥 Registra erro na tabela ErroSincronizacao
+        await registrarErroJestor("reserva", reserva.idExterno.toString(), errorMessage);
+        
         throw new Error('Erro ao inserir reserva no Jestor');
     }
 }
 
+
+
 /**
- * Sincroniza as reservas nao sincronizados do banco local com o Jestor.
+ * Atualiza uma reserva existente no Jestor.
+ * @param reserva - Dados da reserva a serem atualizados.
+ * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function sincronizarReserva() {
+export async function atualizarReservaNoJestor(reserva: typeReserva, idInterno: string) {
     try {
-        const reservasNaoSincronizados = await getReservasNaoSincronizados();
-
-        if(reservasNaoSincronizados){
-            for (const reserva of reservasNaoSincronizados) {
-                const existeNoJestor = await verificarReservaNoJestor(reserva.localizador, reserva.idExterno);
-       
-                if (!existeNoJestor) {
-                    await inserirReservaNoJestor(reserva);
-                    console.log("--------------------------------------------------");    
-                    console.log(`Reserva: ${reserva.localizador}\nSincronizado com sucesso!`);
-
-                } else {
-                    console.log("--------------------------------------------------");
-                    console.log(`Reserva: ${reserva.localizador}\nJa existe no Jestor. Atualizado no banco local.`);
-
-                }
-                // Atualiza o status no banco local para sincronizado
-                await atualizaCampoSincronizadoNoJestor('reserva', reserva.localizador);
+        const data: Record<string, any> = {
+            object_type: JESTOR_TB_RESERVA,
+            data: {
+                [`id_${JESTOR_TB_RESERVA}`]: idInterno, // Campo obrigatório do ID interno
+                hora_checkin: reserva.horaCheckIn,
+                status: reserva.status,
             }
-        }
+        };
+
+        // 🚀 Envia a solicitação de atualização ao Jestor
+        const response = await jestorClient.post(ENDPOINT_UPDATE, data);
+
+        // ✅ Log simplificado de sucesso
+        logDebug('Reserva', `🔹 Reserva ${reserva.localizador} atualizada com sucesso no Jestor!`);
+
+        return response.data;
+
     } catch (error: any) {
-        console.error('Erro ao sincronizar reserva:', error.message);
+        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+
+        // ❌ Log de erro simplificado
+        logDebug('Erro', `❌ Erro ao atualizar reserva ${reserva.localizador} no Jestor: ${errorMessage}`);
+
+        // 🔥 Registra erro na tabela ErroSincronizacao
+        await registrarErroJestor("reserva", reserva.idExterno.toString(), errorMessage);
+        
+        throw new Error(`Erro ao atualizar reserva ${reserva.localizador} no Jestor`);
+    }
+}
+
+/**
+ * Sincroniza apenas UMA reserva específica com o Jestor.
+ */
+export async function sincronizarReserva(reserva: typeReserva) {
+    try {
+        // 📥 Tenta obter o ID interno da reserva no Jestor
+        const idInterno = await obterIdInternoNoJestor(reserva.localizador, reserva.idExterno);
+
+        if (!idInterno) {
+            await inserirReservaNoJestor(reserva);
+        } else {
+            await atualizarReservaNoJestor(reserva, idInterno);
+        }
+
+        // ✅ Marca como sincronizado apenas se não houver erro
+        await atualizaCampoSincronizadoNoJestor('reserva', reserva.localizador);
+
+    } catch (error: any) {
+        const errorMessage = error.message || 'Erro desconhecido';
+
+        logDebug('Erro', `❌ Erro ao sincronizar reserva ${reserva.localizador}: ${errorMessage}`);
+        
+        // ⚠️ Define o campo `sincronizadoNoJestor` como `false` para futuras tentativas
+        await prisma.reserva.update({
+            where: { localizador: reserva.localizador },
+            data: { sincronizadoNoJestor: false },
+        });
+
+        // Lança o erro novamente para tratamento adicional
+        throw new Error(`Erro ao sincronizar reserva ${reserva.localizador}`);
     }
 }
 

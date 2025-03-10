@@ -108,10 +108,6 @@ export async function atualizaCampoSincronizadoNoJestor(
             default:
                 throw new Error(`Tabela '${tabela}' não suportada.`);
         }
-        
-        console.log("--------------------------------------------------");
-        console.log("Registro atualizado no banco de dados com sucesso!");
-
     } catch (error: any){
         console.error(`Erro ao atualizar registro na '${tabela}':`, error.message);
     }
