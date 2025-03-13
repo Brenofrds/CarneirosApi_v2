@@ -47,12 +47,14 @@ export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio) {
             idapi: bloqueio.id,
             idexterno_1: bloqueio.idExterno,
             localizador: bloqueio.localizador,
-            checkin: bloqueio.checkIn,
-            checkout: bloqueio.checkOut,
+            checkin_1: bloqueio.checkIn,
+            checkout_1: bloqueio.checkOut,
             horacheckin: bloqueio.horaCheckIn,
             horacheckout: bloqueio.horaCheckOut,
             notainterna: bloqueio.notaInterna,
             imovelid: bloqueio.imovelId,
+            
+            imovel: bloqueio.imovelId,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {

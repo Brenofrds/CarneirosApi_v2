@@ -55,7 +55,8 @@ export async function inserirImovelNoJestor(imovel: typeImovel) {
             idstays: imovel.idStays,
             sku: imovel.sku,
             status_1: imovel.status,
-            idcondominiostays: imovel.idCondominioStays,
+            idcondominiostays: imovel.idCondominioStays || null,
+            proprietario_id: imovel.proprietarioId || null, // ✅ Agora enviamos também o ID do proprietário
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -88,11 +89,13 @@ export async function atualizarImovelNoJestor(imovel: typeImovel, idInterno: str
         const data: Record<string, any> = {
             object_type: JESTOR_TB_IMOVEL,
             data: {
-                [`id_${JESTOR_TB_IMOVEL}`]: idInterno, // Campo obrigatório do ID interno
+                [`id_${JESTOR_TB_IMOVEL}`]: idInterno, // ✅ Campo obrigatório do ID interno
                 idexterno: imovel.idExterno,
+                idstays: imovel.idStays,
                 sku: imovel.sku,
                 status_1: imovel.status,
-                idcondominiostays: imovel.idCondominioStays,
+                idcondominiostays: imovel.idCondominioStays || null,
+                proprietario_id: imovel.proprietarioId || null, // ✅ Atualizando também o proprietário
             }
         };
 

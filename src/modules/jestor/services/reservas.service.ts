@@ -74,6 +74,7 @@ export async function inserirReservaNoJestor(reserva: typeReserva) {
             condominio: reserva.condominio,
             regiao: reserva.regiao,
             imovel_oficial_sku: reserva.imovelOficialSku,
+            observacao: reserva.observacao,
         };
 
         // Adiciona apenas se os IDs estiverem presentes
@@ -111,8 +112,32 @@ export async function atualizarReservaNoJestor(reserva: typeReserva, idInterno: 
             object_type: JESTOR_TB_RESERVA,
             data: {
                 [`id_${JESTOR_TB_RESERVA}`]: idInterno, // Campo obrigatório do ID interno
+                name: reserva.localizador,
+                id_externo: reserva.idExterno,
+                data_da_reserva: reserva.dataDaCriacao,
+                checkin: reserva.checkIn,
                 hora_checkin: reserva.horaCheckIn,
+                checkout: reserva.checkOut,
+                hora_checkout: reserva.horaCheckOut,
+                quant_hospedes: reserva.quantidadeHospedes,
+                quant_adt: reserva.quantidadeAdultos,
+                quant_chd: reserva.quantidadeCriancas,
+                quant_inf: reserva.quantidadeInfantil,
+                moeda: reserva.moeda,
+                valor_total: reserva.valorTotal,
+                total_pago: reserva.totalPago,
+                pendente_quitacao: reserva.pendenteQuitacao,
+                total_taxas_extras: reserva.totalTaxasExtras,
+                quant_diarias: reserva.quantidadeDiarias,
+                partnercode: reserva.partnerCode,
+                link_stays: reserva.linkStays,
+                id_imovel_stays: reserva.idImovelStays,
+                origem: reserva.origem,
                 status: reserva.status,
+                condominio: reserva.condominio,
+                regiao: reserva.regiao,
+                imovel_oficial_sku: reserva.imovelOficialSku,
+                observacao: reserva.observacao, // ✅ Incluindo observação normalmente
             }
         };
 

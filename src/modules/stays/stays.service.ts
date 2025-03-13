@@ -57,6 +57,8 @@ export const processWebhookData = async (body: any) => {
 
 const processarReservaWebhook = async (payload: any) => {
   try {
+    console.log("📡 Payload recebido no webhook:");
+    console.log(JSON.stringify(payload, null, 2));
     // 🔹 Transformar os dados da reserva recebidos no formato correto para salvar
     const reservaData = transformReserva(payload);
     const agenteData = transformAgente(payload.agent);
@@ -76,22 +78,29 @@ const processarReservaWebhook = async (payload: any) => {
 
     // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
     let imovelId = null;
+    let imovelSku = null;
+    let condominioSku = null;
+    let condominioRegiao = null; 
 
     if (payload._idlisting) {
       const { imovel, proprietario } = await fetchImovelDetalhado(payload._idlisting);
-
+      
       if (imovel) {
+        imovel.owner = proprietario || undefined; 
         // 🔹 Salvar o imóvel no banco de dados
         const imovelSalvo = await salvarImovel(imovel);
         imovelId = imovelSalvo.id;
+        imovelSku = imovelSalvo.sku;
 
-        // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio em paralelo
+        // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio de forma síncrona (aguardando o resultado)
         if (imovel._idproperty) {
-          fetchCondominioDetalhado(imovel._idproperty).then(async (condominioDetalhado) => {
-            if (condominioDetalhado) {
-              await salvarCondominio(condominioDetalhado);
-            }
-          });
+          const condominioDetalhado = await fetchCondominioDetalhado(imovel._idproperty);
+
+          if (condominioDetalhado) {
+            const condominioSalvo = await salvarCondominio(condominioDetalhado);
+            condominioSku = condominioSalvo.sku;
+            condominioRegiao = condominioSalvo.regiao;
+          }
         }
 
         // 🔹 Se houver um proprietário, salvar no banco
@@ -109,6 +118,9 @@ const processarReservaWebhook = async (payload: any) => {
 
     // 🔹 Atualiza a reserva com os IDs corretos
     reservaData.imovelId = imovelId;
+    reservaData.imovelOficialSku = imovelSku || '';
+    reservaData.condominio = condominioSku || '';
+    reservaData.regiao = condominioRegiao || '';
     reservaData.agenteId = agenteId;
     reservaData.canalId = canalId;
 

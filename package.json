@@ -5,7 +5,6 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "seed:proprietarios": "ts-node src/modules/database/seedProprietarios.ts",
     "start:dev": "ts-node-dev src/index.ts",
     "start": "node dist/index.js"
   },

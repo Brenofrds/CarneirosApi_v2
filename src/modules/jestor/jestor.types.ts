@@ -14,6 +14,7 @@ export interface typeHospede{
     nomeCompleto: string;
     email: string | null;
     dataDeNascimento: string | null;
+    idade: number | null;
     telefone: string | null;
     cpf: string | null;
     documento: string | null;
@@ -49,6 +50,7 @@ export interface typeReserva {
     condominio: string;
     regiao: string;
     imovelOficialSku: string;
+    observacao: string | null;
 }
 
 // Tipo para os atributos da tabela de canal no banco de dados
@@ -66,6 +68,7 @@ export interface typeImovel {
     sku: string | null;
     status: string;
     idCondominioStays: string | null;
+    proprietarioId: number | null; // ✅ Adicionado para refletir corretamente o banco de dados
 }
 
 // Tipo para os atributos da tabela de condomínio no banco de dados
@@ -75,7 +78,8 @@ export interface typeCondominio {
     idStays: string;
     sku: string;
     regiao: string;
-}
+    status: string | null; // Status do condomínio (active, inactive, etc.)
+  }
 
 // Tipo para os atributos da tabela de taxaReserva no banco de dados
 export interface typeTaxaReserva {

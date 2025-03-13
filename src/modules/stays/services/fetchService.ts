@@ -5,22 +5,42 @@ export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDe
   try {
     const endpoint = `/booking/clients/${clientId}`;
     const response = await staysClient.get(endpoint);
-
     const data = response.data;
 
     // Verifica se os dados essenciais existem antes de processar
     if (!data || !data._id || !data.name || !data.email) {
-      console.warn(`Dados insuficientes para o hóspede ${clientId}`);
+      console.warn(`⚠️ Dados insuficientes para o hóspede ${clientId}`);
       return null;
     }
 
-    // Mapeia os dados necessários
-    const hospedeDetalhado: HospedeDetalhado = {
+    // 📅 Calcula a idade com base na data de nascimento
+    let idadeCalculada: number | undefined = undefined;
+    if (data.birthDate) {
+      try {
+        const birthDate = new Date(data.birthDate);
+        const today = new Date();
+        idadeCalculada = today.getFullYear() - birthDate.getFullYear();
+
+        // Ajusta caso ainda não tenha feito aniversário este ano
+        if (
+          today.getMonth() < birthDate.getMonth() ||
+          (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
+        ) {
+          idadeCalculada--;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Erro ao calcular idade para hóspede ${data.name}: Data inválida (${data.birthDate})`);
+      }
+    }
+
+    // Retorna os dados do hóspede incluindo a idade já calculada
+    return {
       _id: data._id,
       name: data.name,
       email: data.email,
       isUser: data.isUser,
       birthDate: data.birthDate || null,
+      idade: idadeCalculada, // ✅ Agora a idade já está calculada aqui!
       phones: data.phones?.map((phone: { iso: string; hint?: string }) => ({
         iso: phone.iso,
         hint: phone.hint || null,
@@ -31,17 +51,16 @@ export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDe
         issued: doc.issued || null,
       })),
     };
-
-    return hospedeDetalhado;
   } catch (error: any) {
     if (error.response?.data?.message?.includes('contactEmails/0/adr must match pattern')) {
-      console.warn(`Hóspede ignorado devido a dados corrompidos: ${clientId}`);
+      console.warn(`⚠️ Hóspede ignorado devido a dados corrompidos: ${clientId}`);
       return null; // Ignorar o hóspede com dados inválidos
     }
-    console.error(`Erro ao buscar detalhes do hóspede ${clientId}:`, error.response?.data || error.message);
+    console.error(`❌ Erro ao buscar detalhes do hóspede ${clientId}:`, error.response?.data || error.message);
     return null;
   }
 }
+
 
 
 export async function fetchReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<string[]> {
@@ -72,10 +91,11 @@ export async function fetchReservaDetalhada(reservationId: string): Promise<any>
 export async function fetchImovelDetalhado(listingId: string): Promise<{ imovel: ImovelDetalhado | null; proprietario: ProprietarioDetalhado | null }> {
   try {
     const endpoint = `/content/listings/${listingId}`;
+    
     const response = await staysClient.get(endpoint);
     const data = response.data;
 
-    // Extrair apenas os campos necessários do imóvel
+    // 🔹 Extrair apenas os campos necessários do imóvel
     const imovelDetalhado: ImovelDetalhado = {
       _id: data._id, // ID externo do imóvel na Stays
       id: data.id, // ID interno do imóvel na Stays
@@ -94,10 +114,10 @@ export async function fetchImovelDetalhado(listingId: string): Promise<{ imovel:
 
     return { imovel: imovelDetalhado, proprietario: proprietarioDetalhado };
   } catch (error: any) {
-    console.error(`Erro ao buscar detalhes do imóvel ${listingId}:`, error.response?.data || error.message);
     return { imovel: null, proprietario: null };
   }
 }
+
 
 
 /**
@@ -112,11 +132,20 @@ export async function fetchCondominioDetalhado(condominioId: string): Promise<Co
 
     // Extrair apenas os campos necessários
     const data = response.data;
+
+    // Mapeia os status para os valores corretos
+    const statusMap: Record<string, string> = {
+      "active": "Ativo",
+      "inactive": "Inativo",
+      "hidden": "Oculto"
+    };
+
     const condominioDetalhado: CondominioDetalhado = {
       _id: data._id, // ID externo do condomínio
       id: data.id, // ID interno na Stays
       internalName: data.internalName, // Nome interno ou SKU do condomínio
-      regiao: data.address?.region || 'Região não especificada', // Região do condomínio
+      regiao: data.address?.region || "Região não especificada", // Região do condomínio
+      status: statusMap[data.status] || "Oculto" // Traduz o status ou usa "Oculto" por padrão
     };
 
     return condominioDetalhado;

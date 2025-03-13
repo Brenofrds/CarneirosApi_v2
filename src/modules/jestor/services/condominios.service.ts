@@ -55,6 +55,7 @@ export async function inserirCondominioNoJestor(condominio: typeCondominio) {
             idstays: condominio.idStays,
             skuinternalname: condominio.sku,
             regiao: condominio.regiao,
+            status: condominio.status, 
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -92,6 +93,7 @@ export async function atualizarCondominioNoJestor(condominio: typeCondominio, id
                 idstays: condominio.idStays,
                 skuinternalname: condominio.sku,
                 regiao: condominio.regiao,
+                status: condominio.status,
             }
         };
 

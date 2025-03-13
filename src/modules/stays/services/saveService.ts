@@ -19,9 +19,37 @@ export async function salvarReserva(reserva: ReservaData) {
     where: { localizador: reserva.localizador },
   });
 
+  // 🔍 Verificar se precisa atualizar os dados da reserva
   const precisaAtualizar =
     !reservaExistente ||
-    JSON.stringify(reservaExistente) !== JSON.stringify(reserva);
+    reservaExistente.idExterno !== reserva.idExterno ||
+    reservaExistente.dataDaCriacao !== reserva.dataDaCriacao ||
+    reservaExistente.checkIn !== reserva.checkIn ||
+    reservaExistente.horaCheckIn !== reserva.horaCheckIn ||
+    reservaExistente.checkOut !== reserva.checkOut ||
+    reservaExistente.horaCheckOut !== reserva.horaCheckOut ||
+    reservaExistente.quantidadeHospedes !== reserva.quantidadeHospedes ||
+    reservaExistente.quantidadeAdultos !== reserva.quantidadeAdultos ||
+    reservaExistente.quantidadeCriancas !== reserva.quantidadeCriancas ||
+    reservaExistente.quantidadeInfantil !== reserva.quantidadeInfantil ||
+    reservaExistente.moeda !== reserva.moeda ||
+    reservaExistente.valorTotal !== reserva.valorTotal ||
+    reservaExistente.totalPago !== reserva.totalPago ||
+    reservaExistente.pendenteQuitacao !== reserva.pendenteQuitacao ||
+    reservaExistente.totalTaxasExtras !== reserva.totalTaxasExtras ||
+    reservaExistente.quantidadeDiarias !== reserva.quantidadeDiarias ||
+    reservaExistente.partnerCode !== reserva.partnerCode ||
+    reservaExistente.linkStays !== reserva.linkStays ||
+    reservaExistente.idImovelStays !== reserva.idImovelStays ||
+    reservaExistente.imovelId !== reserva.imovelId ||
+    reservaExistente.canalId !== reserva.canalId ||
+    reservaExistente.agenteId !== reserva.agenteId ||
+    reservaExistente.origem !== reserva.origem ||
+    reservaExistente.status !== reserva.status ||
+    reservaExistente.condominio !== reserva.condominio ||
+    reservaExistente.regiao !== reserva.regiao ||
+    reservaExistente.imovelOficialSku !== reserva.imovelOficialSku ||
+    reservaExistente.observacao !== reserva.observacao;
 
   const reservaSalva = await prisma.reserva.upsert({
     where: { localizador: reserva.localizador },
@@ -87,7 +115,8 @@ export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId:
       hospedeExistente.dataDeNascimento !== hospede.birthDate ||
       hospedeExistente.telefone !== hospede.phones?.[0]?.iso ||
       hospedeExistente.cpf !== hospede.documents?.find((doc) => doc.type === 'cpf')?.numb ||
-      hospedeExistente.documento !== hospede.documents?.find((doc) => doc.type === 'id')?.numb;
+      hospedeExistente.documento !== hospede.documents?.find((doc) => doc.type === 'id')?.numb ||
+      hospedeExistente.idade !== hospede.idade; // ✅ Agora usamos a idade já calculada!
 
   // 🚀 Realiza o upsert do hóspede no banco de dados
   const hospedeSalvo = await prisma.hospede.upsert({
@@ -96,6 +125,7 @@ export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId:
           nomeCompleto: hospede.name,
           email: hospede.email,
           dataDeNascimento: hospede.birthDate || null,
+          idade: hospede.idade, // ✅ Já vem preenchida corretamente
           telefone: hospede.phones?.[0]?.iso || null,
           cpf: hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || null,
           documento: hospede.documents?.find((doc) => doc.type === 'id')?.numb || null,
@@ -107,6 +137,7 @@ export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId:
           nomeCompleto: hospede.name,
           email: hospede.email,
           dataDeNascimento: hospede.birthDate || null,
+          idade: hospede.idade, // ✅ Sem necessidade de recálculo
           telefone: hospede.phones?.[0]?.iso || null,
           cpf: hospede.documents?.find((doc) => doc.type === 'cpf')?.numb || null,
           documento: hospede.documents?.find((doc) => doc.type === 'id')?.numb || null,
@@ -138,7 +169,6 @@ export async function salvarHospede(hospede: HospedeDetalhado | null, reservaId:
 }
 
 
-
 /**
  * Salva ou atualiza um imóvel no banco de dados e tenta sincronizá-lo com o Jestor.
  * 
@@ -163,7 +193,7 @@ export async function salvarImovel(imovel: ImovelDetalhado) {
     imovelExistente.idStays !== imovel.id || 
     imovelExistente.sku !== imovel.internalName || 
     imovelExistente.status !== imovel.status || 
-    imovelExistente.idCondominioStays !== imovel._idproperty || 
+    imovelExistente.idCondominioStays !== imovel._idproperty || // ✅ Atualizado para o novo nome
     imovelExistente.proprietarioId !== proprietarioId;
 
   // 🔹 Realiza o upsert do imóvel no banco de dados
@@ -173,7 +203,7 @@ export async function salvarImovel(imovel: ImovelDetalhado) {
       idStays: imovel.id,
       sku: imovel.internalName,
       status: imovel.status,
-      idCondominioStays: imovel._idproperty || null,
+      idCondominioStays: imovel._idproperty || null, // ✅ Atualizado para refletir a nova propriedade
       proprietarioId,
       sincronizadoNoJestor: precisaAtualizar ? false : imovelExistente?.sincronizadoNoJestor,
     },
@@ -182,7 +212,7 @@ export async function salvarImovel(imovel: ImovelDetalhado) {
       idStays: imovel.id,
       sku: imovel.internalName,
       status: imovel.status,
-      idCondominioStays: imovel._idproperty || null,
+      idCondominioStays: imovel._idproperty || null, // ✅ Atualizado para refletir a nova propriedade
       proprietarioId,
       sincronizadoNoJestor: false,
     },
@@ -210,6 +240,7 @@ export async function salvarImovel(imovel: ImovelDetalhado) {
   return imovelSalvo;
 }
 
+
 /**
  * Salva ou atualiza um condomínio no banco de dados e tenta sincronizá-lo com o Jestor.
  * 
@@ -227,7 +258,8 @@ export async function salvarCondominio(condominio: CondominioDetalhado) {
     !condominioExistente ||
     condominioExistente.idStays !== condominio.id ||
     condominioExistente.sku !== condominio.internalName ||
-    condominioExistente.regiao !== condominio.regiao;
+    condominioExistente.regiao !== condominio.regiao ||
+    condominioExistente.status !== condominio.status; // ✅ Incluímos o status no controle de atualização
 
   // 🚀 Realiza o upsert do condomínio no banco de dados
   const condominioSalvo = await prisma.condominio.upsert({
@@ -236,6 +268,7 @@ export async function salvarCondominio(condominio: CondominioDetalhado) {
       idStays: condominio.id,
       sku: condominio.internalName,
       regiao: condominio.regiao,
+      status: condominio.status, // ✅ Atualiza o status
       sincronizadoNoJestor: precisaAtualizar ? false : condominioExistente?.sincronizadoNoJestor,
     },
     create: {
@@ -243,6 +276,7 @@ export async function salvarCondominio(condominio: CondominioDetalhado) {
       idStays: condominio.id,
       sku: condominio.internalName,
       regiao: condominio.regiao,
+      status: condominio.status, // ✅ Define o status ao criar um novo registro
       sincronizadoNoJestor: false,
     },
   });
@@ -258,16 +292,17 @@ export async function salvarCondominio(condominio: CondominioDetalhado) {
     });
 
   } catch (error: any) {
-    const errorMessage = error.message || 'Erro desconhecido';
+    const errorMessage = error.message || "Erro desconhecido";
 
-    logDebug('Erro', `❌ Erro ao sincronizar condomínio ${condominioSalvo.idExterno} com Jestor: ${errorMessage}`);
+    logDebug("Erro", `❌ Erro ao sincronizar condomínio ${condominioSalvo.idExterno} com Jestor: ${errorMessage}`);
     
     // 🔥 Salva o erro na tabela ErroSincronizacao
-    await registrarErroJestor('condominio', condominioSalvo.id.toString(), errorMessage);
+    await registrarErroJestor("condominio", condominioSalvo.id.toString(), errorMessage);
   }
 
   return condominioSalvo;
 }
+
 
 
 /**

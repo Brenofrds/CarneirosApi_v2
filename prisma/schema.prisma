@@ -21,6 +21,7 @@ model Hospede {
   nomeCompleto         String    // Nome completo do hóspede
   email                String?   // E-mail do hóspede
   dataDeNascimento     String?   // Data de nascimento do hóspede
+  idade                Int?      // Idade do hóspede
   telefone             String?   // Telefone principal do hóspede
   cpf                  String?   // CPF do hóspede
   documento            String?   // Documento de identidade do hóspede
@@ -66,6 +67,7 @@ model Reserva {
   canal                Canal?    @relation(fields: [canalId], references: [id]) // Relação com Canal
   taxasReserva         TaxaReserva[] // Relação com a tabela TaxaReserva
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
+  observacao           String?
 }
 
 model Imovel {
@@ -88,6 +90,7 @@ model Condominio {
   idStays              String    @unique // ID interno (id) do condomínio na Stays
   sku                  String    // Nome interno ou SKU do condomínio (internalName)
   regiao               String    // Região do condomínio
+  status               String?    // Status do condomínio (active, inactive, etc.)
   sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
 }
 

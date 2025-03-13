@@ -62,6 +62,7 @@ export async function inserirHospedeNoJestor(hospede: typeHospede) {
             nomecompleto: hospede.nomeCompleto,
             email: hospede.email,
             datanascimento: hospede.dataDeNascimento,
+            idade: hospede.idade,
             telefone: hospede.telefone,
             cpf: hospede.cpf,
             documento: hospede.documento,

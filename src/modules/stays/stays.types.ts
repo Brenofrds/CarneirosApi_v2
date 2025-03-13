@@ -5,6 +5,7 @@ export interface HospedeDetalhado {
   email: string;
   isUser: boolean;
   birthDate?: string;
+  idade?: number;
   phones?: { iso: string; hint?: string }[];
   documents?: { type: string; numb: string; issued?: string }[];
 }
@@ -39,6 +40,7 @@ export interface ReservaData {
   condominio: string;
   regiao: string;
   imovelOficialSku: string;
+  observacao: string | null;
 }
 
 // Tipo para os detalhes do agente obtidos na API Stays
@@ -52,16 +54,17 @@ export interface ImovelDetalhado {
   id: string;          // ID interno na Stays
   internalName: string; // Nome interno ou SKU do imóvel
   status: string;       // Status do imóvel (ex.: hidden, active)
-  _idproperty?: string; // ID externo do condomínio relacionado
+  _idproperty?: string; // ✅ Novo nome para ID externo do condomínio relacionado
   owner?: ProprietarioDetalhado; // Proprietário do imóvel (pode ser opcional)
 }
 
 // Tipo para os detalhes do condomínio obtidos na API Stays
 export interface CondominioDetalhado {
-  _id: string;         // ID externo do condomínio na Stays
-  id: string;          // ID interno na Stays
+  _id: string;          // ID externo do condomínio na Stays
+  id: string;           // ID interno na Stays
   internalName: string; // Nome interno ou SKU do condomínio
   regiao: string;       // Região do condomínio
+  status?: string;       // Status do condomínio (active, inactive, etc.)
 }
 
 // Tipo para os detalhes da taxa de reserva

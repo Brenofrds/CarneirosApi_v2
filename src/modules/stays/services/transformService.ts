@@ -5,6 +5,14 @@ export function transformReserva(reserva: any): ReservaData {
   const pendenteQuitacao = reserva.price._f_total - (reserva.stats?._f_totalPaid || 0);
   const totalTaxasExtras = reserva.price.extrasDetails?.fees.reduce((acc: number, fee: { _f_val: number }) => acc + fee._f_val, 0) || 0;
 
+  // ✅ Aplicando a lógica do status corretamente
+  let statusReserva = "Pendente"; // Por padrão, assumimos que é "Pendente"
+  if (reserva.type === "booked") {
+    statusReserva = "Ativo"; // Se for "booked", status será "Ativo"
+  } else if (reserva.type === "reserved") {
+    statusReserva = "Pendente"; // Se for "reserved", status será "Pendente"
+  }
+
   return {
     localizador: reserva.id,
     idExterno: reserva._id,
@@ -30,13 +38,13 @@ export function transformReserva(reserva: any): ReservaData {
     canalId: null,
     agenteId: null, 
     origem: reserva.partner?.name || '',
-    status: reserva.type,
+    status: statusReserva, // ✅ Lógica aplicada aqui!
     condominio: '',
     regiao: '',
     imovelOficialSku: '',
+    observacao: reserva.internalNote || null, 
   };
 }
-
 
 export function transformAgente(agent: any): AgenteDetalhado | null {
   return agent ? { _id: agent._id, name: agent.name } : null;
