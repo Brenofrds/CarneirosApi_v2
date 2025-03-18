@@ -63,15 +63,26 @@ export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDe
 
 
 
-export async function fetchReservas(fromDate: string, toDate: string, skip: number, limit: number): Promise<string[]> {
+/**
+ * Busca reservas na API Stays com filtros específicos (from, to, dateType, listingId).
+ *
+ * @param fromDate - Data de início (YYYY-MM-DD).
+ * @param toDate - Data de fim (YYYY-MM-DD).
+ * @param listingId - ID do imóvel (listingId).
+ * @returns Lista de IDs das reservas encontradas.
+ */
+export async function fetchReservas(fromDate: string, toDate: string, listingId: string): Promise<string[]> {
   try {
-    const endpoint = `/booking/reservations?from=${fromDate}&to=${toDate}&dateType=arrival&skip=${skip}&limit=${limit}`;
+    // 🔹 Construindo a URL apenas com os parâmetros necessários
+    const endpoint = `/booking/reservations?from=${fromDate}&to=${toDate}&dateType=arrival&listingId=${listingId}`;
+
+    // 🔹 Fazendo a requisição na API
     const response = await staysClient.get(endpoint);
 
-    // Retornar apenas os IDs das reservas
+    // 🔹 Retornar apenas os IDs das reservas
     return response.data.map((reserva: { _id: string }) => reserva._id);
   } catch (error: any) {
-    console.error('Erro ao buscar reservas:', error.response?.data || error.message);
+    console.error('❌ Erro ao buscar reservas:', error.response?.data || error.message);
     return [];
   }
 }

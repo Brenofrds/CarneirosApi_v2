@@ -9,13 +9,8 @@ async function clearDatabase() {
     console.log('Iniciando limpeza do banco de dados...');
 
     // Ordem de exclusão para respeitar as relações
-    await prisma.taxaReserva.deleteMany({});
-    await prisma.hospede.deleteMany({});
-    await prisma.reserva.deleteMany({});
-    await prisma.agente.deleteMany({});
-    await prisma.imovel.deleteMany({});
-    await prisma.condominio.deleteMany({});
-    await prisma.canal.deleteMany({});
+    await prisma.erroSincronizacaoJestor.deleteMany({});
+    await prisma.erroSincronizacaoStays.deleteMany({});
 
     console.log('Banco de dados limpo com sucesso!');
   } catch (error) {

@@ -11,6 +11,8 @@ export function transformReserva(reserva: any): ReservaData {
     statusReserva = "Ativo"; // Se for "booked", status será "Ativo"
   } else if (reserva.type === "reserved") {
     statusReserva = "Pendente"; // Se for "reserved", status será "Pendente"
+  } else if (reserva.type === "canceled") {
+    statusReserva = "Cancelada";
   }
 
   return {

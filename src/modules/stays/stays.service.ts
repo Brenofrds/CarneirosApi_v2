@@ -3,6 +3,8 @@ import { transformReserva, transformAgente, transformCanal, transformBloqueio } 
 import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva, salvarProprietario, salvarBloqueio, salvarAgente, salvarCanal } from "./services/saveService";
 import prisma from "../../config/database"; // Importa o cliente Prisma
 import { logDebug } from '../../utils/logger';
+import { sincronizarReserva } from "../jestor/services/reservas.service";
+import { typeReserva } from '../jestor/jestor.types'; 
 
 
 /**
@@ -57,8 +59,6 @@ export const processWebhookData = async (body: any) => {
 
 const processarReservaWebhook = async (payload: any) => {
   try {
-    console.log("📡 Payload recebido no webhook:");
-    console.log(JSON.stringify(payload, null, 2));
     // 🔹 Transformar os dados da reserva recebidos no formato correto para salvar
     const reservaData = transformReserva(payload);
     const agenteData = transformAgente(payload.agent);
@@ -225,54 +225,98 @@ export const processarBloqueioWebhook = async (payload: any) => {
 
 
 /**
- * Processa notificações de cancelamento ou exclusão de reservas (reservation.canceled/reservation.deleted).
- * Se a reserva ou o bloqueio não existirem, tenta criar um novo registro completo usando processarReservaWebhook.
+ * Processa notificações de cancelamento ou exclusão de reservas.
+ * Se a reserva já existir, apenas atualiza o status no banco de dados e sincroniza no Jestor.
+ * Se a reserva não existir e o status for "Cancelada", busca detalhes da reserva na API e cria a reserva.
  *
- * @param payload - Objeto contendo os dados da reserva ou bloqueio.
+ * @param payload - Objeto contendo os dados da reserva.
  * @param novoStatus - Novo status a ser atribuído ("Cancelada" ou "Deletada").
  */
 const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
   try {
     console.log(`🛠️ Processando atualização para ${novoStatus}: ${payload._id}`);
-    
+
     // 🔍 Exibe o payload completo para análise
     console.log("🔍 Payload recebido:", JSON.stringify(payload, null, 2));
 
-    // 🔹 Tenta localizar a reserva ou o bloqueio pelo ID externo
+    // 🔹 Tenta localizar a reserva no banco de dados
     let reservaExistente = await prisma.reserva.findUnique({ where: { idExterno: payload._id } });
-    let bloqueioExistente = await prisma.bloqueio.findUnique({ where: { idExterno: payload._id } });
 
-    if (!reservaExistente && !bloqueioExistente) {
-      console.warn(`⚠️ Nenhuma reserva ou bloqueio encontrado para o ID ${payload._id}. Tentando criar novo registro...`);
-
-      // Tenta processar o webhook como uma nova reserva
-      try {
-        return await processarReservaWebhook(payload);
-      } catch (error) {
-        console.error(`❌ Erro ao tentar criar nova reserva/bloqueio:`, error);
-        throw new Error(`Erro ao criar nova reserva/bloqueio para ID ${payload._id}`);
-      }
-    }
-
-    // 🔄 Atualiza o status da reserva existente
+    // ✅ Se a reserva existir, apenas atualiza o status no banco e sincroniza no Jestor
     if (reservaExistente) {
+      console.log(`🔄 Atualizando status da reserva existente para "${novoStatus}"...`);
+
+      // 🔄 Atualiza o status da reserva no banco
       const reservaAtualizada = await prisma.reserva.update({
         where: { idExterno: payload._id },
         data: { status: novoStatus, sincronizadoNoJestor: false },
       });
+
       console.log(`✅ Reserva ${payload._id} atualizada para "${novoStatus}".`);
+
+      // 🔄 Converte para o formato esperado por `sincronizarReserva`
+      const reservaParaSincronizar: typeReserva = {
+        localizador: reservaAtualizada.localizador,
+        idExterno: reservaAtualizada.idExterno,
+        dataDaCriacao: reservaAtualizada.dataDaCriacao,
+        checkIn: reservaAtualizada.checkIn,
+        horaCheckIn: reservaAtualizada.horaCheckIn,
+        checkOut: reservaAtualizada.checkOut,
+        horaCheckOut: reservaAtualizada.horaCheckOut,
+        quantidadeHospedes: reservaAtualizada.quantidadeHospedes,
+        quantidadeAdultos: reservaAtualizada.quantidadeAdultos,
+        quantidadeCriancas: reservaAtualizada.quantidadeCriancas,
+        quantidadeInfantil: reservaAtualizada.quantidadeInfantil,
+        moeda: reservaAtualizada.moeda,
+        valorTotal: reservaAtualizada.valorTotal,
+        totalPago: reservaAtualizada.totalPago,
+        pendenteQuitacao: reservaAtualizada.pendenteQuitacao,
+        totalTaxasExtras: reservaAtualizada.totalTaxasExtras,
+        quantidadeDiarias: reservaAtualizada.quantidadeDiarias,
+        partnerCode: reservaAtualizada.partnerCode || null,
+        linkStays: reservaAtualizada.linkStays,
+        idImovelStays: reservaAtualizada.idImovelStays,
+        origem: reservaAtualizada.origem,
+        status: reservaAtualizada.status,
+        condominio: reservaAtualizada.condominio,
+        regiao: reservaAtualizada.regiao,
+        imovelOficialSku: reservaAtualizada.imovelOficialSku,
+        observacao: reservaAtualizada.observacao || null,
+        imovelId: reservaAtualizada.imovelId ?? null,
+        canalId: reservaAtualizada.canalId ?? null,
+      };
+
+      // 🔄 Sincroniza a atualização com o Jestor
+      console.log(`🔄 Sincronizando reserva ${payload._id} com o Jestor...`);
+      await sincronizarReserva(reservaParaSincronizar);
+      console.log(`✅ Sincronização concluída para a reserva ${payload._id}.`);
+
       return reservaAtualizada;
     }
 
-    // 🔄 Atualiza o status do bloqueio existente
-    if (bloqueioExistente) {
-      const bloqueioAtualizado = await prisma.bloqueio.update({
-        where: { idExterno: payload._id },
-        data: { notaInterna: `Status atualizado para ${novoStatus}`, sincronizadoNoJestor: false },
-      });
-      console.log(`✅ Bloqueio ${payload._id} atualizado para "${novoStatus}".`);
-      return bloqueioAtualizado;
+    // 🔴 Se a reserva não existir e o status for "Cancelada", buscamos detalhes na API Stays e processamos a reserva
+    if (novoStatus === "Cancelada") {
+      console.warn(`⚠️ Reserva ${payload._id} não encontrada no banco. Buscando detalhes na API Stays...`);
+
+      // 📡 Buscar detalhes da reserva na API Stays
+      const detalhesReserva = await fetchReservaDetalhada(payload._id);
+
+      if (!detalhesReserva) {
+        console.error(`❌ Não foi possível obter detalhes para a reserva ${payload._id}.`);
+        throw new Error(`Erro: Reserva ${payload._id} não encontrada na API.`);
+      }
+
+      console.log(`🔹 Detalhes da reserva ${payload._id} encontrados. Criando nova reserva...`);
+
+      // 🔄 Processar a reserva usando a função principal que já salva no banco e no Jestor
+      return await processarReservaWebhook(detalhesReserva);
     }
+
+    // 🚫 Se o status for "Deletada" e a reserva não existir, **não faz nada** (a reserva foi realmente deletada)
+    if (novoStatus === "Deletada") {
+      console.warn(`⚠️ Reserva ${payload._id} não encontrada no banco e não pode ser recriada.`);
+    }
+
   } catch (error) {
     console.error(`❌ Erro ao atualizar status para "${novoStatus}":`, error);
     throw new Error(`Erro ao atualizar status para "${novoStatus}".`);
