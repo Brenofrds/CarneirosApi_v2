@@ -100,17 +100,25 @@ export async function atualizarCanalNoJestor(canal: typeCanal, idInterno: string
 /**
  * Sincroniza apenas UM canal específico com o Jestor.
  */
-export async function sincronizarCanal(canal: typeCanal) {
+export async function sincronizarCanal(canal: typeCanal): Promise<number | null> {
     try {
-        const idInterno = await obterIdInternoCanalNoJestor(canal.idExterno);
 
+        // 🔍 Usa o jestorId do canal (caso já tenha) para evitar nova consulta
+        let idInterno: number | null = canal.jestorId || null;
+
+        // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
         if (!idInterno) {
-            await inserirCanalNoJestor(canal);
-        } else {
-            await atualizarCanalNoJestor(canal, idInterno);
+        idInterno = await obterIdInternoCanalNoJestor(canal.idExterno);
         }
 
-        await atualizaCampoSincronizadoNoJestor('canal', canal.idExterno);
+        if (!idInterno) {
+            const response = await inserirCanalNoJestor(canal);
+            idInterno = response?.data?.[`id_${JESTOR_TB_CANAL}`];
+        } else {
+            await atualizarCanalNoJestor(canal, idInterno.toString());
+        }
+
+        return idInterno;
 
     } catch (error: any) {
         const errorMessage = error.message || 'Erro desconhecido';

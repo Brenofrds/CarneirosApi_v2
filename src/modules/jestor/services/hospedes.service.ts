@@ -54,7 +54,7 @@ export async function obterIdInternoHospedeNoJestor(nome: string, idExterno: str
  * Insere um hóspede no Jestor.
  * @param hospede - Dados do hóspede a serem inseridos.
  */
-export async function inserirHospedeNoJestor(hospede: typeHospede) {
+export async function inserirHospedeNoJestor(hospede: typeHospede, reservaIdJestor?: number) {
     try {
         const data: Record<string, any> = {
             name: hospede.id,
@@ -67,6 +67,7 @@ export async function inserirHospedeNoJestor(hospede: typeHospede) {
             cpf: hospede.cpf,
             documento: hospede.documento,
             id_reserva: hospede.reservaId,
+            reserva_1: reservaIdJestor,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -94,7 +95,7 @@ export async function inserirHospedeNoJestor(hospede: typeHospede) {
  * @param hospede - Dados do hóspede a serem atualizados.
  * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function atualizarHospedeNoJestor(hospede: typeHospede, idInterno: string) {
+export async function atualizarHospedeNoJestor(hospede: typeHospede, idInterno: string, reservaIdJestor?: number) {
     try {
         const data: Record<string, any> = {
             object_type: JESTOR_TB_HOSPEDE,
@@ -107,6 +108,7 @@ export async function atualizarHospedeNoJestor(hospede: typeHospede, idInterno: 
                 cpf: hospede.cpf,
                 documento: hospede.documento,
                 id_reserva: hospede.reservaId,
+                reserva_1: reservaIdJestor,
             }
         };
 
@@ -137,15 +139,15 @@ export async function atualizarHospedeNoJestor(hospede: typeHospede, idInterno: 
 /**
  * Sincroniza apenas UM hóspede específico com o Jestor.
  */
-export async function sincronizarHospede(hospede: typeHospede) {
+export async function sincronizarHospede(hospede: typeHospede, reservaIdJestor?: number) {
     try {
         // 📥 Tenta obter o ID interno do hóspede no Jestor
         const idInterno = await obterIdInternoHospedeNoJestor(hospede.nomeCompleto, hospede.idExterno, hospede.reservaId);
 
         if (!idInterno) {
-            await inserirHospedeNoJestor(hospede);
+            await inserirHospedeNoJestor(hospede, reservaIdJestor);
         } else {
-            await atualizarHospedeNoJestor(hospede, idInterno);
+            await atualizarHospedeNoJestor(hospede, idInterno, reservaIdJestor);
         }
 
         // ✅ Marca como sincronizado apenas se não houver erro

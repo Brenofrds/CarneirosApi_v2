@@ -8,7 +8,7 @@ export async function fetchHospedeDetalhado(clientId: string): Promise<HospedeDe
     const data = response.data;
 
     // Verifica se os dados essenciais existem antes de processar
-    if (!data || !data._id || !data.name || !data.email) {
+    if (!data || !data._id || !data.name ) {
       console.warn(`⚠️ Dados insuficientes para o hóspede ${clientId}`);
       return null;
     }
@@ -106,12 +106,20 @@ export async function fetchImovelDetalhado(listingId: string): Promise<{ imovel:
     const response = await staysClient.get(endpoint);
     const data = response.data;
 
+    // 🔹 Mapeia os status para os valores corretos
+    const STATUS_MAP: Record<string, string> = {
+      "active": "Ativo",
+      "inactive": "Inativo",
+      "hidden": "Oculto",
+      "draft": "Rascunho"
+    };
+
     // 🔹 Extrair apenas os campos necessários do imóvel
     const imovelDetalhado: ImovelDetalhado = {
       _id: data._id, // ID externo do imóvel na Stays
       id: data.id, // ID interno do imóvel na Stays
       internalName: data.internalName, // Nome interno ou SKU do imóvel
-      status: data.status, // Status do imóvel
+      status: STATUS_MAP[data.status] || "Oculto", // Traduz o status ou usa "Oculto" por padrão
       _idproperty: data._idproperty, // ID externo do condomínio relacionado
     };
 
@@ -125,6 +133,7 @@ export async function fetchImovelDetalhado(listingId: string): Promise<{ imovel:
 
     return { imovel: imovelDetalhado, proprietario: proprietarioDetalhado };
   } catch (error: any) {
+    console.error(`Erro ao buscar detalhes do imóvel ${listingId}: ${error.message || 'Erro desconhecido'}`);
     return { imovel: null, proprietario: null };
   }
 }

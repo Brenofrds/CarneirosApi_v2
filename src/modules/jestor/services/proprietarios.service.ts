@@ -60,7 +60,7 @@ export async function inserirProprietarioNoJestor(proprietario: typeProprietario
             data,
         });
 
-        logDebug('Proprietário', `🔹 Proprietário ${proprietario.nome} inserido com sucesso no Jestor!`);
+        logDebug('Proprietário', `✅ Proprietário ${proprietario.nome} inserido com sucesso no Jestor!`);
 
         return response.data;
 
@@ -114,28 +114,35 @@ export async function atualizarProprietarioNoJestor(proprietario: typeProprietar
 /**
  * Sincroniza apenas UM proprietário específico com o Jestor.
  */
-export async function sincronizarProprietario(proprietario: typeProprietario) {
+export async function sincronizarProprietario(proprietario: typeProprietario): Promise<number | null> {
     try {
-        const idInterno = await obterIdInternoProprietarioNoJestor(proprietario.nome, proprietario.telefone);
-
-        if (!idInterno) {
-            await inserirProprietarioNoJestor(proprietario);
-        } else {
-            await atualizarProprietarioNoJestor(proprietario, idInterno);
-        }
-
-        await atualizaCampoSincronizadoNoJestor('proprietario', proprietario.id);
-
+      let idInterno: number | null = proprietario.jestorId || null;
+  
+      if (!idInterno) {
+        idInterno = await obterIdInternoProprietarioNoJestor(proprietario.nome, proprietario.telefone);
+      }
+  
+      if (!idInterno) {
+        const response = await inserirProprietarioNoJestor(proprietario);
+        idInterno = response?.data?.[`id_${JESTOR_TB_PROPRIETARIO}`];
+      } else {
+        await atualizarProprietarioNoJestor(proprietario, idInterno.toString());
+      }
+  
+      await atualizaCampoSincronizadoNoJestor('proprietario', proprietario.id);
+  
+      return idInterno;
+  
     } catch (error: any) {
-        const errorMessage = error.message || 'Erro desconhecido';
-
-        logDebug('Erro', `❌ Erro ao sincronizar proprietário ${proprietario.nome}: ${errorMessage}`);
-        
-        await prisma.proprietario.update({
-            where: { id: proprietario.id },
-            data: { sincronizadoNoJestor: false },
-        });
-
-        throw new Error(`Erro ao sincronizar proprietário ${proprietario.nome}`);
+      const errorMessage = error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao sincronizar proprietário ${proprietario.nome}: ${errorMessage}`);
+  
+      await prisma.proprietario.update({
+        where: { id: proprietario.id },
+        data: { sincronizadoNoJestor: false },
+      });
+  
+      throw new Error(`Erro ao sincronizar proprietário ${proprietario.nome}`);
     }
-}
+  }
+  

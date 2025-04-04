@@ -1,11 +1,11 @@
 
-// Tipo para os atributos da tabela de agente no banco de dados
 export interface typeAgente {
     id: number;
     idExterno: string;
     nome: string;
-    //reservas: string | null;
-}
+    jestorId: number | null; // <- agora o campo opcional está aqui!
+  }
+  
 
 // Tipo para os atributos da tabela de hospede no banco de dados
 export interface typeHospede{
@@ -23,6 +23,7 @@ export interface typeHospede{
 
 // Tipo para os atributos da tabela de reserva no banco de dados
 export interface typeReserva {
+    id: number;
     localizador: string;
     idExterno: string;
     dataDaCriacao: string; // Somente data no formato YYYY-MM-DD
@@ -51,6 +52,7 @@ export interface typeReserva {
     regiao: string;
     imovelOficialSku: string;
     observacao: string | null;
+    jestorId: number | null;
 }
 
 // Tipo para os atributos da tabela de canal no banco de dados
@@ -58,6 +60,7 @@ export interface typeCanal {
     id: number;
     idExterno: string;
     titulo: string;
+    jestorId: number | null;
 }
 
 // Tipo para os atributos da tabela de imóvel no banco de dados
@@ -68,7 +71,8 @@ export interface typeImovel {
     sku: string | null;
     status: string;
     idCondominioStays: string | null;
-    proprietarioId: number | null; // ✅ Adicionado para refletir corretamente o banco de dados
+    proprietarioId: number | null;
+    jestorId: number | null; // ✅ Adicionado para refletir corretamente o banco de dados
 }
 
 // Tipo para os atributos da tabela de condomínio no banco de dados
@@ -78,7 +82,8 @@ export interface typeCondominio {
     idStays: string;
     sku: string;
     regiao: string;
-    status: string | null; // Status do condomínio (active, inactive, etc.)
+    status: string | null;
+    jestorId: number | null; 
   }
 
 // Tipo para os atributos da tabela de taxaReserva no banco de dados
@@ -107,4 +112,5 @@ export interface typeProprietario {
     id: number;
     nome: string;
     telefone: string | null;
+    jestorId: number | null;
 }

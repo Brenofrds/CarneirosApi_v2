@@ -99,29 +99,41 @@ export async function atualizarAgenteNoJestor(agente: typeAgente, idInterno: str
 
 /**
  * Sincroniza apenas UM agente específico com o Jestor.
+ * Usa o campo jestorId presente no agente para decidir se deve inserir ou atualizar.
+ *
+ * @param agente - Dados do agente, incluindo o jestorId (opcional)
+ * @returns - ID interno do Jestor
  */
-export async function sincronizarAgente(agente: typeAgente) {
+export async function sincronizarAgente(agente: typeAgente): Promise<number | null> {
     try {
-        const idInterno = await obterIdInternoAgenteNoJestor(agente.idExterno);
-
-        if (!idInterno) {
-            await inserirAgenteNoJestor(agente);
-        } else {
-            await atualizarAgenteNoJestor(agente, idInterno);
-        }
-
-        await atualizaCampoSincronizadoNoJestor('agente', agente.idExterno);
-
+      // 🔍 Usa o jestorId do agente (caso já tenha) para evitar nova consulta
+      let idInterno: number | null = agente.jestorId || null;
+  
+      // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
+      if (!idInterno) {
+        idInterno = await obterIdInternoAgenteNoJestor(agente.idExterno);
+      }
+  
+      // 🚀 Decide entre inserir ou atualizar
+      if (!idInterno) {
+        const response = await inserirAgenteNoJestor(agente);
+        idInterno = response?.data?.[`id_${JESTOR_TB_AGENTE}`];
+      } else {
+        await atualizarAgenteNoJestor(agente, idInterno.toString());
+      }
+  
+      // ✅ Retorna o ID interno do Jestor para salvar no banco local
+      return idInterno;
+  
     } catch (error: any) {
-        const errorMessage = error.message || 'Erro desconhecido';
-
-        logDebug('Erro', `❌ Erro ao sincronizar agente ${agente.idExterno}: ${errorMessage}`);
-
-        await prisma.agente.update({
-            where: { idExterno: agente.idExterno },
-            data: { sincronizadoNoJestor: false },
-        });
-
-        throw new Error(`Erro ao sincronizar agente ${agente.idExterno}`);
+      const errorMessage = error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao sincronizar agente ${agente.idExterno}: ${errorMessage}`);
+  
+      await prisma.agente.update({
+        where: { idExterno: agente.idExterno },
+        data: { sincronizadoNoJestor: false },
+      });
+  
+      throw new Error(`Erro ao sincronizar agente ${agente.idExterno}`);
     }
-}
+  }

@@ -46,10 +46,14 @@ export async function obterIdInternoNoJestor(localizador: string, idExterno: str
  * Insere uma reserva no Jestor.
  * @param reserva - Dados da reserva a serem inseridos.
  */
-export async function inserirReservaNoJestor(reserva: typeReserva) {
+export async function inserirReservaNoJestor(reserva: typeReserva, agenteIdJestor?: number, canalIdJestor?: number, imovelIdJestor?: number) {
     try {
+
+        logDebug('Reserva', `🔍 agenteIdJestor, canalIdJestor e imovelIdJestor recebido para reserva ${reserva.localizador}: ${agenteIdJestor}, ${canalIdJestor} e ${imovelIdJestor}`);
+
         const data: Record<string, any> = {
             name: reserva.localizador,
+            id_bd_engnet: reserva.id,
             id_externo: reserva.idExterno,
             data_da_reserva: reserva.dataDaCriacao,
             checkin: reserva.checkIn,
@@ -67,24 +71,34 @@ export async function inserirReservaNoJestor(reserva: typeReserva) {
             total_taxas_extras: reserva.totalTaxasExtras,
             quant_diarias: reserva.quantidadeDiarias,
             partnercode: reserva.partnerCode,
-            link_stays: reserva.linkStays,
             id_imovel_stays: reserva.idImovelStays,
             origem: reserva.origem,
-            status: reserva.status,
+            status1: reserva.status,
             condominio: reserva.condominio,
             regiao: reserva.regiao,
             imovel_oficial_sku: reserva.imovelOficialSku,
             observacao: reserva.observacao,
+            link_stays_1: reserva.linkStays,
+            agente: agenteIdJestor,
+            canal_1: canalIdJestor,
+            imovel: imovelIdJestor,
         };
 
         // Adiciona apenas se os IDs estiverem presentes
         if (reserva.imovelId) data.id_imovel = reserva.imovelId;
         if (reserva.canalId) data.canal = reserva.canalId;
+        if (agenteIdJestor) data.agente = agenteIdJestor;
+        if (canalIdJestor) data.canal_1 = canalIdJestor;
+        if (imovelIdJestor) data.imovel = imovelIdJestor;
+
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
             object_type: JESTOR_TB_RESERVA,
             data,
         });
+
+        // ✅ Log simplificado de sucesso
+        logDebug('Reserva', `✅ Reserva ${reserva.localizador} Inserida com sucesso no Jestor!`);
 
         return response.data;
 
@@ -106,13 +120,17 @@ export async function inserirReservaNoJestor(reserva: typeReserva) {
  * @param reserva - Dados da reserva a serem atualizados.
  * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function atualizarReservaNoJestor(reserva: typeReserva, idInterno: string) {
+export async function atualizarReservaNoJestor(reserva: typeReserva, idInterno: string, agenteIdJestor?: number, canalIdJestor?: number, imovelIdJestor?: number) {
     try {
+
+        logDebug('Reserva', `🔍 agenteIdJestor, canalIdJestor e imovelIdJestor recebido para reserva ${reserva.localizador}: ${agenteIdJestor}, ${canalIdJestor} e ${imovelIdJestor}`);
+        
         const data: Record<string, any> = {
             object_type: JESTOR_TB_RESERVA,
             data: {
                 [`id_${JESTOR_TB_RESERVA}`]: idInterno, // Campo obrigatório do ID interno
                 name: reserva.localizador,
+                id_bd_engnet: reserva.id,
                 id_externo: reserva.idExterno,
                 data_da_reserva: reserva.dataDaCriacao,
                 checkin: reserva.checkIn,
@@ -130,16 +148,24 @@ export async function atualizarReservaNoJestor(reserva: typeReserva, idInterno: 
                 total_taxas_extras: reserva.totalTaxasExtras,
                 quant_diarias: reserva.quantidadeDiarias,
                 partnercode: reserva.partnerCode,
-                link_stays: reserva.linkStays,
                 id_imovel_stays: reserva.idImovelStays,
                 origem: reserva.origem,
                 status: reserva.status,
                 condominio: reserva.condominio,
                 regiao: reserva.regiao,
                 imovel_oficial_sku: reserva.imovelOficialSku,
-                observacao: reserva.observacao, // ✅ Incluindo observação normalmente
+                observacao: reserva.observacao,
+                link_stays_1: reserva.linkStays,
+                agente: agenteIdJestor,
+                canal_1: canalIdJestor,
+                imovel: imovelIdJestor,
             }
         };
+
+        if (agenteIdJestor) data.agente = agenteIdJestor;
+        if (canalIdJestor) data.canal_1 = canalIdJestor;
+        if (imovelIdJestor) data.imovel = imovelIdJestor;
+
 
         // 🚀 Envia a solicitação de atualização ao Jestor
         const response = await jestorClient.post(ENDPOINT_UPDATE, data);
@@ -165,35 +191,42 @@ export async function atualizarReservaNoJestor(reserva: typeReserva, idInterno: 
 /**
  * Sincroniza apenas UMA reserva específica com o Jestor.
  */
-export async function sincronizarReserva(reserva: typeReserva) {
+export async function sincronizarReserva(reserva: typeReserva, agenteIdJestor?: number, canalIdJestor?: number, imovelIdJestor?: number): Promise<number | null> {
     try {
-        // 📥 Tenta obter o ID interno da reserva no Jestor
-        const idInterno = await obterIdInternoNoJestor(reserva.localizador, reserva.idExterno);
 
+        let idInterno: number | null = reserva.jestorId || null;
+
+        // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
         if (!idInterno) {
-            await inserirReservaNoJestor(reserva);
-        } else {
-            await atualizarReservaNoJestor(reserva, idInterno);
+            idInterno = await obterIdInternoNoJestor(reserva.localizador, reserva.idExterno);
         }
-
+    
+        if (!idInterno) {
+            // 🔼 Inserção no Jestor com o agenteIdJestor e canalIdJestor
+            const response = await inserirReservaNoJestor(reserva, agenteIdJestor, canalIdJestor, imovelIdJestor);
+            idInterno = response?.data?.[`id_${JESTOR_TB_RESERVA}`];
+        } else {
+            // 🛠 Atualização no Jestor com o agenteIdJestor e canalIdJestor
+            await atualizarReservaNoJestor(reserva, idInterno.toString(), agenteIdJestor, canalIdJestor, imovelIdJestor);
+        }
+    
         // ✅ Marca como sincronizado apenas se não houver erro
         await atualizaCampoSincronizadoNoJestor('reserva', reserva.localizador);
 
+        return idInterno;
+  
     } catch (error: any) {
-        const errorMessage = error.message || 'Erro desconhecido';
-
-        logDebug('Erro', `❌ Erro ao sincronizar reserva ${reserva.localizador}: ${errorMessage}`);
-        
-        // ⚠️ Define o campo `sincronizadoNoJestor` como `false` para futuras tentativas
-        await prisma.reserva.update({
-            where: { localizador: reserva.localizador },
-            data: { sincronizadoNoJestor: false },
-        });
-
-        // Lança o erro novamente para tratamento adicional
-        throw new Error(`Erro ao sincronizar reserva ${reserva.localizador}`);
+      const errorMessage = error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao sincronizar reserva ${reserva.localizador}: ${errorMessage}`);
+  
+      await prisma.reserva.update({
+        where: { localizador: reserva.localizador },
+        data: { sincronizadoNoJestor: false },
+      });
+  
+      throw new Error(`Erro ao sincronizar reserva ${reserva.localizador}`);
     }
-}
+  }
 
 /* funcao de teste
 (async () => {

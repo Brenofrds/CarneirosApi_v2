@@ -41,7 +41,7 @@ export async function obterIdInternoBloqueioNoJestor(idExterno: string) {
  * Insere um bloqueio no Jestor.
  * @param bloqueio - Dados do bloqueio a serem inseridos.
  */
-export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio) {
+export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio, imovelIdJestor?: number) {
     try {
         const data: Record<string, any> = {
             idapi: bloqueio.id,
@@ -53,8 +53,8 @@ export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio) {
             horacheckout: bloqueio.horaCheckOut,
             notainterna: bloqueio.notaInterna,
             imovelid: bloqueio.imovelId,
-            
             imovel: bloqueio.imovelId,
+            imovel_1: imovelIdJestor,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -79,17 +79,26 @@ export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio) {
  * @param bloqueio - Dados do bloqueio a serem atualizados.
  * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function atualizarBloqueioNoJestor(bloqueio: typeBloqueio, idInterno: string) {
+export async function atualizarBloqueioNoJestor(bloqueio: typeBloqueio, idInterno: string, imovelIdJestor?: number) {
     try {
+        logDebug('Bloqueio', `🔍 imovelIdJestor recebido para bloqueio ${bloqueio.idExterno}: ${imovelIdJestor}`);
+
         const data: Record<string, any> = {
             object_type: JESTOR_TB_BLOQUEIO,
             data: {
-                [`id_${JESTOR_TB_BLOQUEIO}`]: idInterno, // Campo obrigatório do ID interno
+                [`id_${JESTOR_TB_BLOQUEIO}`]: idInterno, // ID interno obrigatório
+                idapi: bloqueio.id,
+                idexterno_1: bloqueio.idExterno,
                 localizador: bloqueio.localizador,
-                checkin: bloqueio.checkIn,
-                checkout: bloqueio.checkOut,
-                status: 'Deletado',
-            }
+                checkin_1: bloqueio.checkIn,
+                checkout_1: bloqueio.checkOut,
+                horacheckin: bloqueio.horaCheckIn,
+                horacheckout: bloqueio.horaCheckOut,
+                notainterna: bloqueio.notaInterna,
+                imovelid: bloqueio.imovelId,
+                imovel: bloqueio.imovelId,
+                imovel_1: imovelIdJestor,
+            },
         };
 
         const response = await jestorClient.post(ENDPOINT_UPDATE, data);
@@ -112,17 +121,15 @@ export async function atualizarBloqueioNoJestor(bloqueio: typeBloqueio, idIntern
 /**
  * Sincroniza apenas UM bloqueio específico com o Jestor.
  */
-export async function sincronizarBloqueio(bloqueio: typeBloqueio) {
+export async function sincronizarBloqueio(bloqueio: typeBloqueio, imovelIdJestor?: number) {
     try {
         const idInterno = await obterIdInternoBloqueioNoJestor(bloqueio.idExterno);
 
         if (!idInterno) {
-            await inserirBloqueioNoJestor(bloqueio);
+            await inserirBloqueioNoJestor(bloqueio, imovelIdJestor);
         } else {
-            await atualizarBloqueioNoJestor(bloqueio, idInterno);
+            await atualizarBloqueioNoJestor(bloqueio, idInterno, imovelIdJestor);
         }
-
-        await atualizaCampoSincronizadoNoJestor('bloqueio', bloqueio.idExterno);
 
     } catch (error: any) {
         const errorMessage = error.message || 'Erro desconhecido';

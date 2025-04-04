@@ -64,34 +64,37 @@ const processarReservaWebhook = async (payload: any) => {
     const agenteData = transformAgente(payload.agent);
     const canalData = transformCanal(payload.partner);
 
-    // 🔹 Criar/Atualizar Agente e obter ID do banco
     let agenteId: number | null = null;
+    let agenteIdJestor: number | null = null;
+
     if (agenteData) {
-      agenteId = await salvarAgente(agenteData);
+      const resultadoAgente = await salvarAgente(agenteData);
+      agenteId = resultadoAgente.id;
+      agenteIdJestor = resultadoAgente.jestorId;
     }
 
     // 🔹 Criar/Atualizar Canal e obter ID do banco
     let canalId: number | null = null;
+    let canalIdJestor: number | null = null;
+
     if (canalData) {
-      canalId = await salvarCanal(canalData);
+      const resultadoCanal = await salvarCanal(canalData);
+      canalId = resultadoCanal.id;
+      canalIdJestor = resultadoCanal.jestorId;
     }
 
     // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
     let imovelId = null;
     let imovelSku = null;
+    let imovelIdJestor = null;
     let condominioSku = null;
     let condominioRegiao = null; 
+    let condominioIdJestor = null;
 
     if (payload._idlisting) {
       const { imovel, proprietario } = await fetchImovelDetalhado(payload._idlisting);
       
       if (imovel) {
-        imovel.owner = proprietario || undefined; 
-        // 🔹 Salvar o imóvel no banco de dados
-        const imovelSalvo = await salvarImovel(imovel);
-        imovelId = imovelSalvo.id;
-        imovelSku = imovelSalvo.sku;
-
         // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio de forma síncrona (aguardando o resultado)
         if (imovel._idproperty) {
           const condominioDetalhado = await fetchCondominioDetalhado(imovel._idproperty);
@@ -100,53 +103,56 @@ const processarReservaWebhook = async (payload: any) => {
             const condominioSalvo = await salvarCondominio(condominioDetalhado);
             condominioSku = condominioSalvo.sku;
             condominioRegiao = condominioSalvo.regiao;
+            condominioIdJestor = condominioSalvo.jestorId;
           }
         }
 
-        // 🔹 Se houver um proprietário, salvar no banco
-        if (proprietario) {
-          const proprietarioId = await salvarProprietario(proprietario.nome, proprietario.telefone);
+        imovel.owner = proprietario || undefined; 
+        // 🔹 Salvar o imóvel no banco de dados
+        const imovelSalvo = await salvarImovel(imovel, condominioIdJestor ?? undefined);
+        imovelId = imovelSalvo.id;
+        imovelSku = imovelSalvo.sku;
+        imovelIdJestor = imovelSalvo.jestorId;
 
-          // 🔹 Atualizar o imóvel para associar ao proprietário
-          await prisma.imovel.update({
-            where: { id: imovelId },
-            data: { proprietarioId },
-          });
-        }
+        
       }
     }
 
     // 🔹 Atualiza a reserva com os IDs corretos
     reservaData.imovelId = imovelId;
     reservaData.imovelOficialSku = imovelSku || '';
+    reservaData.imovelIdJestor = imovelIdJestor;
     reservaData.condominio = condominioSku || '';
     reservaData.regiao = condominioRegiao || '';
     reservaData.agenteId = agenteId;
+    reservaData.agenteIdJestor = agenteIdJestor;
     reservaData.canalId = canalId;
+    reservaData.canalIdJestor = canalIdJestor;
 
     // 🔹 Salvar Reserva no banco com os IDs corretos
-    const reservaSalva = await salvarReserva(reservaData);
+    const { id: reservaId, jestorId: reservaIdJestor } = await salvarReserva(reservaData);
+
 
     // 🔹 Salva Hóspede (depois de salvar a reserva!)
     if (payload._idclient) {
       const hospedeDetalhado = await fetchHospedeDetalhado(payload._idclient);
       if (hospedeDetalhado) {
-        await salvarHospede(hospedeDetalhado, reservaSalva.id);
+        await salvarHospede(hospedeDetalhado, reservaId, reservaIdJestor ?? undefined);
       }
     }
 
     // 🔹 Salva Taxas da Reserva
     const taxasReservas = payload.price?.extrasDetails?.fees?.map((taxa: { name: string; _f_val: number }) => ({
-      reservaId: reservaSalva.id,
+      reservaId: reservaId,
       name: taxa.name?.trim() || "Taxa Desconhecida",
       valor: taxa._f_val,
     })) || [];
 
-    await salvarTaxasReserva(taxasReservas);
+    await salvarTaxasReserva(taxasReservas, reservaIdJestor ?? undefined);
 
     logDebug('Reserva', `Reserva ${reservaData.localizador} processada com sucesso!`);
     
-    return reservaSalva;
+    return reservaId;
 
   } catch (error: any) {
     logDebug('Erro', `Erro ao processar reserva ${payload._id}: ${error.message}`);
@@ -157,69 +163,58 @@ const processarReservaWebhook = async (payload: any) => {
 
 /**
  * Processa notificações de bloqueios (reservation.created ou reservation.modified com type: "blocked").
- * Essa função é chamada quando o webhook da Stays indica que uma reserva do tipo "blocked" foi criada ou modificada.
  *
  * @param payload - Objeto contendo os dados da reserva bloqueada recebidos do webhook da Stays.
  */
 export const processarBloqueioWebhook = async (payload: any) => {
   try {
-    console.log(` Processando webhook para bloqueio ${payload._id}`);
+    logDebug("Bloqueio", `🔹 Processando webhook para bloqueio ${payload._id}`);
 
-    // 🔹 Transformar os dados do bloqueio para o formato correto
+    // 🔹 Transformar os dados do payload no formato correto
     const bloqueioData = transformBloqueio(payload);
 
-    // 🔹 Buscar e salvar Imóvel, Proprietário e Condomínio antes de registrar o bloqueio.
     let imovelId: number | null = null;
+    let imovelIdJestor: number | null = null;
+    let condominioIdJestor: number | null = null;
 
     if (payload._idlisting) {
-      // 🔍 Busca detalhes do imóvel e do proprietário na API da Stays
       const { imovel, proprietario } = await fetchImovelDetalhado(payload._idlisting);
 
       if (imovel) {
-        // 🔹 Salvar o imóvel no banco de dados
-        const imovelSalvo = await salvarImovel(imovel);
-        imovelId = imovelSalvo.id;
-        bloqueioData.imovelId = imovelId; // Associa o imóvel ao bloqueio
-
-        // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio em paralelo
+        // 🔹 Se tiver ID de condomínio, buscar e salvar antes do imóvel
         if (imovel._idproperty) {
-          fetchCondominioDetalhado(imovel._idproperty).then(async (condominioDetalhado) => {
-            if (condominioDetalhado) {
-              await salvarCondominio(condominioDetalhado);
-            }
-          });
+          const condominioDetalhado = await fetchCondominioDetalhado(imovel._idproperty);
+
+          if (condominioDetalhado) {
+            const condominioSalvo = await salvarCondominio(condominioDetalhado);
+            condominioIdJestor = condominioSalvo.jestorId;
+          }
         }
 
-        // 🔹 Se houver um proprietário, salvar no banco
-        if (proprietario) {
-          const proprietarioId = await salvarProprietario(proprietario.nome, proprietario.telefone);
+        // 🔹 Atribui o proprietário ao imóvel antes de salvar
+        imovel.owner = proprietario || undefined;
 
-          // 🔹 Atualizar o imóvel para associar ao proprietário
-          await prisma.imovel.update({
-            where: { id: imovelId },
-            data: { proprietarioId },
-          });
-        }
+        const imovelSalvo = await salvarImovel(imovel, condominioIdJestor ?? undefined);
+        imovelId = imovelSalvo.id;
+        imovelIdJestor = imovelSalvo.jestorId;
+
+        // 🔹 Atualiza os dados do bloqueio com o ID do imóvel
+        bloqueioData.imovelId = imovelId;
+        bloqueioData.imovelIdJestor = imovelIdJestor ?? null;
       } else {
-        console.warn(` Imóvel ${payload._idlisting} não encontrado na API da Stays.`);
+        logDebug("Aviso", `⚠️ Imóvel ${payload._idlisting} não encontrado na API da Stays.`);
       }
     }
 
-    // 🔹 Atualiza os dados do bloqueio com os IDs corretos
-    bloqueioData.imovelId = imovelId;
-
-    console.log("🔍 Dados transformados para salvar bloqueio:", bloqueioData);
-
-    // 🔹 Salvar Bloqueio no banco com os IDs corretos
+    // 🔹 Salvar o bloqueio com dados completos
     const bloqueioSalvo = await salvarBloqueio(bloqueioData);
 
-    console.log(` Bloqueio salvo com sucesso: ${bloqueioSalvo.id}`);
-    
+    logDebug("Bloqueio", `✅ Bloqueio ${bloqueioSalvo.id} processado com sucesso!`);
     return bloqueioSalvo;
-  } catch (error) {
-    console.error(" Erro ao processar bloqueio:", error);
-    
-    throw new Error("Erro ao processar bloqueio.");
+
+  } catch (error: any) {
+    logDebug("Erro", `❌ Erro ao processar bloqueio ${payload._id}: ${error.message}`);
+    throw new Error(`Erro ao processar bloqueio ${payload._id}`);
   }
 };
 
@@ -234,10 +229,7 @@ export const processarBloqueioWebhook = async (payload: any) => {
  */
 const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
   try {
-    console.log(`🛠️ Processando atualização para ${novoStatus}: ${payload._id}`);
-
-    // 🔍 Exibe o payload completo para análise
-    console.log("🔍 Payload recebido:", JSON.stringify(payload, null, 2));
+    logDebug("Reserva", `Processando status "${novoStatus}" para reserva ${payload._id}`);
 
     // 🔹 Tenta localizar a reserva no banco de dados
     let reservaExistente = await prisma.reserva.findUnique({ where: { idExterno: payload._id } });
@@ -256,6 +248,7 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
 
       // 🔄 Converte para o formato esperado por `sincronizarReserva`
       const reservaParaSincronizar: typeReserva = {
+        id: reservaAtualizada.id,
         localizador: reservaAtualizada.localizador,
         idExterno: reservaAtualizada.idExterno,
         dataDaCriacao: reservaAtualizada.dataDaCriacao,
@@ -284,12 +277,12 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
         observacao: reservaAtualizada.observacao || null,
         imovelId: reservaAtualizada.imovelId ?? null,
         canalId: reservaAtualizada.canalId ?? null,
+        jestorId: reservaAtualizada.jestorId ?? null,
       };
 
-      // 🔄 Sincroniza a atualização com o Jestor
-      console.log(`🔄 Sincronizando reserva ${payload._id} com o Jestor...`);
       await sincronizarReserva(reservaParaSincronizar);
-      console.log(`✅ Sincronização concluída para a reserva ${payload._id}.`);
+
+      logDebug("Reserva", `Reserva ${payload._id} atualizada para "${novoStatus}" e sincronizada com sucesso!`);
 
       return reservaAtualizada;
     }
@@ -302,11 +295,8 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
       const detalhesReserva = await fetchReservaDetalhada(payload._id);
 
       if (!detalhesReserva) {
-        console.error(`❌ Não foi possível obter detalhes para a reserva ${payload._id}.`);
-        throw new Error(`Erro: Reserva ${payload._id} não encontrada na API.`);
+        throw new Error(`Erro: Detalhes da reserva ${payload._id} não encontrados na API.`);
       }
-
-      console.log(`🔹 Detalhes da reserva ${payload._id} encontrados. Criando nova reserva...`);
 
       // 🔄 Processar a reserva usando a função principal que já salva no banco e no Jestor
       return await processarReservaWebhook(detalhesReserva);
@@ -314,11 +304,11 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
 
     // 🚫 Se o status for "Deletada" e a reserva não existir, **não faz nada** (a reserva foi realmente deletada)
     if (novoStatus === "Deletada") {
-      console.warn(`⚠️ Reserva ${payload._id} não encontrada no banco e não pode ser recriada.`);
+      logDebug("Reserva", `Reserva ${payload._id} não encontrada no banco e não pode ser recriada.`);
     }
 
-  } catch (error) {
-    console.error(`❌ Erro ao atualizar status para "${novoStatus}":`, error);
+  } catch (error: any) {
+    logDebug("Erro", `Erro ao processar status "${novoStatus}" para reserva ${payload._id}: ${error.message}`);
     throw new Error(`Erro ao atualizar status para "${novoStatus}".`);
   }
 };
@@ -330,45 +320,38 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
  */
 export const processarListingWebhook = async (payload: any) => {
   try {
-    // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
     let imovelId: number | null = null;
+    let condominioIdJestor: number | null = null;
 
     if (payload._id) {
       // 🔹 Busca detalhes do imóvel e do proprietário na API da Stays
       const { imovel, proprietario } = await fetchImovelDetalhado(payload._id);
 
       if (imovel) {
-        // 🔹 Salvar o imóvel no banco de dados
-        const imovelSalvo = await salvarImovel(imovel);
-        imovelId = imovelSalvo.id;
-
-        // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio em paralelo
+        // 🔹 Se o imóvel tiver um ID de condomínio, buscar e salvar o condomínio de forma síncrona
         if (imovel._idproperty) {
-          fetchCondominioDetalhado(imovel._idproperty).then(async (condominioDetalhado) => {
-            if (condominioDetalhado) {
-              await salvarCondominio(condominioDetalhado);
-            }
-          });
+          const condominioDetalhado = await fetchCondominioDetalhado(imovel._idproperty);
+
+          if (condominioDetalhado) {
+            const condominioSalvo = await salvarCondominio(condominioDetalhado);
+            condominioIdJestor = condominioSalvo.jestorId;
+          }
         }
 
-        // 🔹 Se houver um proprietário, salvar no banco e associar ao imóvel
-        if (proprietario) {
-          const proprietarioId = await salvarProprietario(proprietario.nome, proprietario.telefone);
+        // 🔹 Atribui o proprietário ao objeto do imóvel
+        imovel.owner = proprietario || undefined;
 
-          await prisma.imovel.update({
-            where: { id: imovelId },
-            data: { proprietarioId },
-          });
-        }
+        // 🔹 Salvar o imóvel no banco de dados (inclui salvarProprietario internamente)
+        const imovelSalvo = await salvarImovel(imovel, condominioIdJestor ?? undefined);
+        imovelId = imovelSalvo.id;
       }
     }
 
-    logDebug('Imovel', `Imovel ${payload._id} processado com sucesso!`);
-
+    logDebug('Imovel', `🏠 Imóvel ${payload._id} processado com sucesso!`);
     return imovelId;
 
   } catch (error: any) {
-    logDebug('Erro', `Erro ao processar listagem de imóvel ${payload._id}: ${error.message}`);
+    logDebug('Erro', `❌ Erro ao processar listagem de imóvel ${payload._id}: ${error.message}`);
     throw new Error(`Erro ao processar listagem de imóvel ${payload._id}`);
   }
 };

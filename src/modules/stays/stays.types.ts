@@ -41,6 +41,9 @@ export interface ReservaData {
   regiao: string;
   imovelOficialSku: string;
   observacao: string | null;
+  agenteIdJestor?: number | null;
+  canalIdJestor?: number | null;
+  imovelIdJestor?: number | null;
 }
 
 // Tipo para os detalhes do agente obtidos na API Stays
@@ -97,4 +100,5 @@ export interface BloqueioDetalhado {
   notaInterna?: string;   // Nota interna associada ao bloqueio
   idImovelStays: string;  // ID externo do imóvel na Stays associado ao bloqueio
   imovelId?: number | null; // ID do imóvel relacionado no banco de dados (se já cadastrado)
+  imovelIdJestor?: number | null;
 }

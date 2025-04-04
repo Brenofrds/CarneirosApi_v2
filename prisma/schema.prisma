@@ -11,6 +11,7 @@ model Agente {
   id                   Int      @id @default(autoincrement())
   idExterno            String   @unique // ID do agente na Stays
   nome                 String
+  jestorId             Int?
   sincronizadoNoJestor Boolean  @default(false) // Controle de sincronização com o Jestor
   reservas             Reserva[] // Relação com as reservas associadas
 }
@@ -27,6 +28,8 @@ model Hospede {
   documento            String?   // Documento de identidade do hóspede
   reservaId            Int       // Relacionamento com a tabela Reserva
   reserva              Reserva   @relation(fields: [reservaId], references: [id])
+  jestorId             Int?
+  reservaIdJestor      Int?
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
 }
 
@@ -67,6 +70,8 @@ model Reserva {
   canal                Canal?    @relation(fields: [canalId], references: [id]) // Relação com Canal
   taxasReserva         TaxaReserva[] // Relação com a tabela TaxaReserva
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
+  jestorId             Int?
+  imovelIdJestor       Int?
   observacao           String?
 }
 
@@ -81,6 +86,8 @@ model Imovel {
   proprietarioId       Int?       
   proprietario         Proprietario? @relation(fields: [proprietarioId], references: [id]) // Relação opcional com Proprietario
   bloqueios            Bloqueio[] // ✅ Adicionado: Relação com a tabela Bloqueio
+  jestorId             Int?
+  condominioIdJestor   Int?
   sincronizadoNoJestor Boolean    @default(false) // Controle de sincronização com o Jestor
 }
 
@@ -91,6 +98,7 @@ model Condominio {
   sku                  String    // Nome interno ou SKU do condomínio (internalName)
   regiao               String    // Região do condomínio
   status               String?    // Status do condomínio (active, inactive, etc.)
+  jestorId             Int?
   sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
 }
 
@@ -100,6 +108,7 @@ model TaxaReserva {
   name                 String   // Nome da taxa
   valor                Float    // Valor da taxa
   reserva              Reserva  @relation(fields: [reservaId], references: [id])
+  jestorId             Int?
   sincronizadoNoJestor Boolean  @default(false) // Indica sincronização com o Jestor
 
   @@unique([reservaId, name]) // Evita duplicação de taxas para a mesma reserva
@@ -110,6 +119,7 @@ model Canal {
   idExterno            String   @unique  // ID externo do canal (partner._id)
   titulo               String   // Nome do canal (partner.name)
   reservas             Reserva[] // Relação com reservas (1 Canal -> N Reservas)
+  jestorId             Int?
   sincronizadoNoJestor Boolean  @default(false) // Controle de sincronização com o Jestor
 }
 
@@ -118,6 +128,7 @@ model Proprietario {
   nome                 String    // Nome do proprietário
   telefone             String?   // Telefone principal do proprietário
   imoveis              Imovel[]  // Relação com os imóveis associados ao proprietário
+  jestorId             Int?
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
 
   @@unique([nome, telefone]) // Evita duplicação de proprietários com o mesmo nome e telefone
@@ -134,6 +145,8 @@ model Bloqueio {
   notaInterna          String?   // Nota interna associada ao bloqueio
   imovelId             Int?      // Permite `null` se o imóvel não for encontrado
   imovel               Imovel?   @relation(fields: [imovelId], references: [id]) // Relacionado a um imóvel específico
+  jestorId             Int?
+  imovelIdJestor       Int?
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
 
   @@unique([idExterno, imovelId]) // Garante que o mesmo bloqueio não seja cadastrado duas vezes para o mesmo imóvel
@@ -151,12 +164,12 @@ model ErroSincronizacaoJestor {
 }
 
 model ErroSincronizacaoStays {
-  id                  Int      @id @default(autoincrement())
-  acao                String   // Ação do webhook (ex: "reservation.modified")
-  payloadId           String   // ID do payload da Stays
-  erro                String   // Mensagem de erro
-  tentativas          Int      @default(0) // Número de tentativas de reprocessamento
-  data               DateTime @default(now()) // Data do erro (somente a data)
-  hora               String   // Hora do erro (apenas HH:mm:ss)
+  id                   Int      @id @default(autoincrement())
+  acao                 String   // Ação do webhook (ex: "reservation.modified")
+  payloadId            String   // ID do payload da Stays
+  erro                 String   // Mensagem de erro
+  tentativas           Int      @default(0) // Número de tentativas de reprocessamento
+  data                 DateTime @default(now()) // Data do erro (somente a data)
+  hora                 String   // Hora do erro (apenas HH:mm:ss)
   sincronizadoNoJestor Boolean @default(false) // Indica sincronização com o Jestor
 }

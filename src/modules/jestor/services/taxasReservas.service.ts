@@ -9,6 +9,7 @@ const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
 const JESTOR_TB_TAXARESERVA = '7l02yg9daf48d5cfmzbsm';
+const JESTOR_TB_RESERVA = 'e4sqtj0lt_yjxd075da5t';
 
 /**
  * Consulta o Jestor para verificar se a taxa de reserva existe e, se sim, retorna o ID interno.
@@ -47,13 +48,15 @@ export async function obterIdInternoTaxaReservaNoJestor(id: string | number, nom
  * Insere uma taxa de reserva no Jestor.
  * @param taxaReserva - Dados da taxa de reserva a serem inseridos.
  */
-export async function inserirTaxaReservaNoJestor(taxaReserva: typeTaxaReserva) {
+export async function inserirTaxaReservaNoJestor(taxaReserva: typeTaxaReserva, reservaIdJestor?: number) {
     try {
+
         const data: Record<string, any> = {
             idbdapi: taxaReserva.id,
             reservaid: taxaReserva.reservaId,
             nometaxa: taxaReserva.name,
             valor: taxaReserva.valor,
+            testengnet_reservas: reservaIdJestor,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -78,7 +81,7 @@ export async function inserirTaxaReservaNoJestor(taxaReserva: typeTaxaReserva) {
  * @param taxaReserva - Dados da taxa de reserva a serem atualizados.
  * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function atualizarTaxaReservaNoJestor(taxaReserva: typeTaxaReserva, idInterno: string) {
+export async function atualizarTaxaReservaNoJestor(taxaReserva: typeTaxaReserva, idInterno: string, reservaIdJestor?: number) {
     try {
         const data: Record<string, any> = {
             object_type: JESTOR_TB_TAXARESERVA,
@@ -87,6 +90,7 @@ export async function atualizarTaxaReservaNoJestor(taxaReserva: typeTaxaReserva,
                 reservaid: taxaReserva.reservaId,
                 nometaxa: taxaReserva.name,
                 valor: taxaReserva.valor,
+                testengnet_reservas: reservaIdJestor,
             }
         };
 
@@ -108,17 +112,21 @@ export async function atualizarTaxaReservaNoJestor(taxaReserva: typeTaxaReserva,
     }
 }
 
+
+
+
+
 /**
  * Sincroniza apenas UMA taxa de reserva específica com o Jestor.
  */
-export async function sincronizarTaxaReserva(taxaReserva: typeTaxaReserva) {
+export async function sincronizarTaxaReserva(taxaReserva: typeTaxaReserva, reservaIdJestor?: number) {
     try {
         const idInterno = await obterIdInternoTaxaReservaNoJestor(taxaReserva.id, taxaReserva.name);
 
         if (!idInterno) {
-            await inserirTaxaReservaNoJestor(taxaReserva);
+            await inserirTaxaReservaNoJestor(taxaReserva, reservaIdJestor);
         } else {
-            await atualizarTaxaReservaNoJestor(taxaReserva, idInterno);
+            await atualizarTaxaReservaNoJestor(taxaReserva, idInterno, reservaIdJestor);
         }
 
         await atualizaCampoSincronizadoNoJestor('taxaReserva', taxaReserva.id.toString());

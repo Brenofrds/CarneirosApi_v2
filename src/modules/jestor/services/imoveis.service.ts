@@ -47,16 +47,18 @@ export async function obterIdInternoImovelNoJestor(idExterno: string, sku: strin
  * Insere um imóvel no Jestor.
  * @param imovel - Dados do imóvel a serem inseridos.
  */
-export async function inserirImovelNoJestor(imovel: typeImovel) {
+export async function inserirImovelNoJestor(imovel: typeImovel, condominioIdJestor?: number, proprietarioIdJestor?: number) {
     try {
         const data: Record<string, any> = {
             idbdengnet: imovel.id,
             idexterno: imovel.idExterno,
             idstays: imovel.idStays,
             sku: imovel.sku,
-            status_1: imovel.status,
+            status_2: imovel.status,
             idcondominiostays: imovel.idCondominioStays || null,
             proprietario_id: imovel.proprietarioId || null, // ✅ Agora enviamos também o ID do proprietário
+            condominio: condominioIdJestor || null, 
+            proprietario: proprietarioIdJestor || null,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -84,7 +86,7 @@ export async function inserirImovelNoJestor(imovel: typeImovel) {
  * @param imovel - Dados do imóvel a serem atualizados.
  * @param idInterno - ID interno do Jestor necessário para a atualização.
  */
-export async function atualizarImovelNoJestor(imovel: typeImovel, idInterno: string) {
+export async function atualizarImovelNoJestor(imovel: typeImovel, idInterno: string, condominioIdJestor?: number, proprietarioIdJestor?: number) {
     try {
         const data: Record<string, any> = {
             object_type: JESTOR_TB_IMOVEL,
@@ -93,9 +95,11 @@ export async function atualizarImovelNoJestor(imovel: typeImovel, idInterno: str
                 idexterno: imovel.idExterno,
                 idstays: imovel.idStays,
                 sku: imovel.sku,
-                status_1: imovel.status,
+                status_2: imovel.status,
                 idcondominiostays: imovel.idCondominioStays || null,
-                proprietario_id: imovel.proprietarioId || null, // ✅ Atualizando também o proprietário
+                proprietario_id: imovel.proprietarioId || null,
+                condominio: condominioIdJestor || null, 
+                proprietario: proprietarioIdJestor || null,
             }
         };
 
@@ -126,19 +130,25 @@ export async function atualizarImovelNoJestor(imovel: typeImovel, idInterno: str
 /**
  * Sincroniza apenas UM imóvel específico com o Jestor.
  */
-export async function sincronizarImovel(imovel: typeImovel) {
+export async function sincronizarImovel(imovel: typeImovel, condominioIdJestor?: number, proprietarioIdJestor?: number): Promise<number | null> {
     try {
-        // 📥 Tenta obter o ID interno do imóvel no Jestor
-        const idInterno = await obterIdInternoImovelNoJestor(imovel.idExterno, imovel.sku);
 
+        // 🔍 Usa o jestorId do canal (caso já tenha) para evitar nova consulta
+        let idInterno: number | null = imovel.jestorId || null;
+
+        // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
         if (!idInterno) {
-            await inserirImovelNoJestor(imovel);
-        } else {
-            await atualizarImovelNoJestor(imovel, idInterno);
+            idInterno = await obterIdInternoImovelNoJestor(imovel.idExterno, imovel.sku);
         }
 
-        // ✅ Marca como sincronizado apenas se não houver erro
-        await atualizaCampoSincronizadoNoJestor('imovel', imovel.idExterno);
+        if (!idInterno) {
+            const response = await inserirImovelNoJestor(imovel, condominioIdJestor, proprietarioIdJestor);
+            idInterno = response?.data?.[`id_${JESTOR_TB_IMOVEL}`];
+        } else {
+            await atualizarImovelNoJestor(imovel, idInterno.toString(), condominioIdJestor, proprietarioIdJestor);
+        }
+
+        return idInterno;
 
     } catch (error: any) {
         const errorMessage = error.message || 'Erro desconhecido';

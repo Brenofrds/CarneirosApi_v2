@@ -55,7 +55,7 @@ export async function inserirCondominioNoJestor(condominio: typeCondominio) {
             idstays: condominio.idStays,
             skuinternalname: condominio.sku,
             regiao: condominio.regiao,
-            status: condominio.status, 
+            status_1: condominio.status, 
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -93,7 +93,7 @@ export async function atualizarCondominioNoJestor(condominio: typeCondominio, id
                 idstays: condominio.idStays,
                 skuinternalname: condominio.sku,
                 regiao: condominio.regiao,
-                status: condominio.status,
+                status_1: condominio.status,
             }
         };
 
@@ -121,17 +121,27 @@ export async function atualizarCondominioNoJestor(condominio: typeCondominio, id
 /**
  * Sincroniza apenas UM condomínio específico com o Jestor.
  */
-export async function sincronizarCondominio(condominio: typeCondominio) {
+export async function sincronizarCondominio(condominio: typeCondominio): Promise<number | null> {
     try {
-        const idInterno = await obterIdInternoCondominioNoJestor(condominio.idExterno, condominio.sku);
 
+        let idInterno: number | null = condominio.jestorId || null;
+
+        // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
         if (!idInterno) {
-            await inserirCondominioNoJestor(condominio);
+            idInterno = await obterIdInternoCondominioNoJestor(condominio.idExterno, condominio.sku);
+        }
+
+        // 🚀 Decide entre inserir ou atualizar
+        if (!idInterno) {
+            const response = await inserirCondominioNoJestor(condominio);
+            idInterno = response?.data?.[`id_${JESTOR_TB_CONDOMINIO}`];
         } else {
-            await atualizarCondominioNoJestor(condominio, idInterno);
+            await atualizarCondominioNoJestor(condominio, idInterno.toString());
         }
 
         await atualizaCampoSincronizadoNoJestor('condominio', condominio.idExterno);
+
+        return idInterno;
 
     } catch (error: any) {
         const errorMessage = error.message || 'Erro desconhecido';
