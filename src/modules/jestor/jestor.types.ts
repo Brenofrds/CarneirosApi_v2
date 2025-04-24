@@ -73,6 +73,7 @@ export interface typeImovel {
     idCondominioStays: string | null;
     proprietarioId: number | null;
     jestorId: number | null; // ✅ Adicionado para refletir corretamente o banco de dados
+    regiao: string | null;
 }
 
 // Tipo para os atributos da tabela de condomínio no banco de dados
@@ -82,6 +83,7 @@ export interface typeCondominio {
     idStays: string;
     sku: string;
     regiao: string;
+    titulo: string | null;
     status: string | null;
     jestorId: number | null; 
   }
@@ -105,6 +107,8 @@ export interface typeBloqueio {
     horaCheckOut: string | null;
     notaInterna: string | null;
     imovelId: number | null;
+    status: string | null;
+    jestorId: number | null;
 }
 
 // Tipo para os atributos da tabela de proprietario no banco de dados

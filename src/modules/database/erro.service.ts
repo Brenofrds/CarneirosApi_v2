@@ -58,8 +58,9 @@ export async function registrarErroJestor(tabela: string, registroId: string, er
  * @param acao - Ação do webhook (ex: "reservation.modified").
  * @param payloadId - ID do payload da Stays.
  * @param erro - Mensagem de erro detalhada.
+ * @param payloadJson - Objeto bruto da reserva com erro
  */
-export async function registrarErroStays(acao: string, payloadId: string, erro: string) {
+export async function registrarErroStays(acao: string, payloadId: string, erro: string, payloadJson?: any) {
   try {
     const now = new Date();
 
@@ -80,6 +81,7 @@ export async function registrarErroStays(acao: string, payloadId: string, erro: 
       data: {
         acao,
         payloadId,
+        payloadJson: payloadJson ? JSON.stringify(payloadJson) : null,
         erro,
         tentativas: 0, // Primeira tentativa falhou
         data: new Date(dataFormatada), // Salva apenas a data

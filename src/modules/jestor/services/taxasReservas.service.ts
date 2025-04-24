@@ -71,7 +71,6 @@ export async function inserirTaxaReservaNoJestor(taxaReserva: typeTaxaReserva, r
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
         logDebug('Erro', `❌ Erro ao inserir taxa de reserva ${taxaReserva.name} no Jestor: ${errorMessage}`);
-        await registrarErroJestor('taxaReserva', taxaReserva.id.toString(), errorMessage);
         throw new Error(`Erro ao inserir taxa de reserva ${taxaReserva.name} no Jestor`);
     }
 }
@@ -107,7 +106,6 @@ export async function atualizarTaxaReservaNoJestor(taxaReserva: typeTaxaReserva,
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
         logDebug('Erro', `❌ Erro ao atualizar taxa de reserva ${taxaReserva.name} no Jestor: ${errorMessage}`);
-        await registrarErroJestor('taxaReserva', taxaReserva.id.toString(), errorMessage);
         throw new Error(`Erro ao atualizar taxa de reserva ${taxaReserva.name} no Jestor`);
     }
 }

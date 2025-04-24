@@ -59,6 +59,7 @@ model Reserva {
   origem               String
   status               String
   condominio           String
+  condominioTitulo     String?
   regiao               String
   imovelOficialSku     String
   hospedes             Hospede[] // Relação com a tabela Hospede
@@ -82,6 +83,7 @@ model Imovel {
   sku                  String?    // Nome interno ou SKU do imóvel (internalName)
   status               String     // Status do imóvel (ex.: hidden, active)
   idCondominioStays    String?    // ID externo do condomínio relacionado
+  regiao               String?
   reservas             Reserva[]  // Relação com a tabela Reserva (1 Imóvel -> N Reservas)
   proprietarioId       Int?       
   proprietario         Proprietario? @relation(fields: [proprietarioId], references: [id]) // Relação opcional com Proprietario
@@ -97,6 +99,7 @@ model Condominio {
   idStays              String    @unique // ID interno (id) do condomínio na Stays
   sku                  String    // Nome interno ou SKU do condomínio (internalName)
   regiao               String    // Região do condomínio
+  titulo               String?    
   status               String?    // Status do condomínio (active, inactive, etc.)
   jestorId             Int?
   sincronizadoNoJestor Boolean   @default(false) // Controle de sincronização com o Jestor
@@ -147,6 +150,7 @@ model Bloqueio {
   imovel               Imovel?   @relation(fields: [imovelId], references: [id]) // Relacionado a um imóvel específico
   jestorId             Int?
   imovelIdJestor       Int?
+  status               String?
   sincronizadoNoJestor Boolean   @default(false) // Indica sincronização com o Jestor
 
   @@unique([idExterno, imovelId]) // Garante que o mesmo bloqueio não seja cadastrado duas vezes para o mesmo imóvel
@@ -166,7 +170,8 @@ model ErroSincronizacaoJestor {
 model ErroSincronizacaoStays {
   id                   Int      @id @default(autoincrement())
   acao                 String   // Ação do webhook (ex: "reservation.modified")
-  payloadId            String   // ID do payload da Stays
+  payloadId            String   // ID do payload da 
+  payloadJson          String?  
   erro                 String   // Mensagem de erro
   tentativas           Int      @default(0) // Número de tentativas de reprocessamento
   data                 DateTime @default(now()) // Data do erro (somente a data)

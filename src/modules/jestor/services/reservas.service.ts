@@ -105,10 +105,6 @@ export async function inserirReservaNoJestor(reserva: typeReserva, agenteIdJesto
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
         console.error(`❌ Erro ao inserir reserva ${reserva.localizador} no Jestor:`, errorMessage);
-
-        // 🔥 Registra erro na tabela ErroSincronizacao
-        await registrarErroJestor("reserva", reserva.idExterno.toString(), errorMessage);
-        
         throw new Error('Erro ao inserir reserva no Jestor');
     }
 }
@@ -177,13 +173,7 @@ export async function atualizarReservaNoJestor(reserva: typeReserva, idInterno: 
 
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
-
-        // ❌ Log de erro simplificado
         logDebug('Erro', `❌ Erro ao atualizar reserva ${reserva.localizador} no Jestor: ${errorMessage}`);
-
-        // 🔥 Registra erro na tabela ErroSincronizacao
-        await registrarErroJestor("reserva", reserva.idExterno.toString(), errorMessage);
-        
         throw new Error(`Erro ao atualizar reserva ${reserva.localizador} no Jestor`);
     }
 }

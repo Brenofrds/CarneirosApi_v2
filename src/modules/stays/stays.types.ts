@@ -59,6 +59,7 @@ export interface ImovelDetalhado {
   status: string;       // Status do imóvel (ex.: hidden, active)
   _idproperty?: string; // ✅ Novo nome para ID externo do condomínio relacionado
   owner?: ProprietarioDetalhado; // Proprietário do imóvel (pode ser opcional)
+  regiao?: string;
 }
 
 // Tipo para os detalhes do condomínio obtidos na API Stays
@@ -68,6 +69,7 @@ export interface CondominioDetalhado {
   internalName: string; // Nome interno ou SKU do condomínio
   regiao: string;       // Região do condomínio
   status?: string;       // Status do condomínio (active, inactive, etc.)
+  titulo?: string;
 }
 
 // Tipo para os detalhes da taxa de reserva
@@ -101,4 +103,5 @@ export interface BloqueioDetalhado {
   idImovelStays: string;  // ID externo do imóvel na Stays associado ao bloqueio
   imovelId?: number | null; // ID do imóvel relacionado no banco de dados (se já cadastrado)
   imovelIdJestor?: number | null;
+  status?: string | null;
 }

@@ -56,7 +56,7 @@ export const staysWebhookHandler = async (req: Request, res: Response) => {
     const errorMessage = error.message || "Erro desconhecido";
 
     // 🔥 Agora registramos o erro no banco de dados
-    await registrarErroStays(action, payloadId, errorMessage);
+    await registrarErroStays(action, payloadId, errorMessage, req.body?.payload);
 
     logDebug('Erro', `❌ Erro ao processar webhook: ${errorMessage}`);
   }
@@ -104,7 +104,7 @@ async function processWebhook(req: Request, res: Response, timestamp: string) {
     const errorMessage = error.message || "Erro desconhecido";
 
     // 🔥 Agora registramos o erro no banco de dados
-    await registrarErroStays(action, payloadId, errorMessage);
+    await registrarErroStays(action, payloadId, error.message, req.body.payload);
 
     logDebug('Erro', `❌ [${timestamp}] Erro ao processar webhook: ${errorMessage}`);
     console.log("-----------------------------------------------------------------------------------------------------------");

@@ -63,7 +63,6 @@ export async function inserirCanalNoJestor(canal: typeCanal) {
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
         logDebug('Erro', `❌ Erro ao inserir canal ${canal.idExterno} no Jestor: ${errorMessage}`);
-        await registrarErroJestor('canal', canal.idExterno, errorMessage);
         throw new Error(`Erro ao inserir canal ${canal.idExterno} no Jestor`);
     }
 }
@@ -92,7 +91,6 @@ export async function atualizarCanalNoJestor(canal: typeCanal, idInterno: string
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
         logDebug('Erro', `❌ Erro ao atualizar canal ${canal.idExterno} no Jestor: ${errorMessage}`);
-        await registrarErroJestor('canal', canal.idExterno, errorMessage);
         throw new Error(`Erro ao atualizar canal ${canal.idExterno} no Jestor`);
     }
 }

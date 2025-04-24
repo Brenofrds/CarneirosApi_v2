@@ -1,5 +1,11 @@
 import { ReservaData, AgenteDetalhado, CanalDetalhado, TaxaReservaDetalhada, BloqueioDetalhado } from '../stays.types';
 
+export function formatarDataISOParaBR(data: string): string {
+  if (!data || data.length < 10) return ''; // Validação básica
+  const [ano, mes, dia] = data.substring(0, 10).split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
 export function transformReserva(reserva: any): ReservaData {
   const diarias = (new Date(reserva.checkOutDate).getTime() - new Date(reserva.checkInDate).getTime()) / (1000 * 60 * 60 * 24);
   const pendenteQuitacao = reserva.price._f_total - (reserva.stats?._f_totalPaid || 0);
@@ -7,6 +13,7 @@ export function transformReserva(reserva: any): ReservaData {
 
   // ✅ Aplicando a lógica do status corretamente
   let statusReserva = "Pendente"; // Por padrão, assumimos que é "Pendente"
+
   if (reserva.type === "booked") {
     statusReserva = "Ativo"; // Se for "booked", status será "Ativo"
   } else if (reserva.type === "reserved") {
@@ -19,9 +26,9 @@ export function transformReserva(reserva: any): ReservaData {
     localizador: reserva.id,
     idExterno: reserva._id,
     dataDaCriacao: reserva.creationDate.split('T')[0],
-    checkIn: reserva.checkInDate.split('T')[0],
+    checkIn: formatarDataISOParaBR(reserva.checkInDate.split('T')[0]),
     horaCheckIn: reserva.checkInTime,
-    checkOut: reserva.checkOutDate.split('T')[0],
+    checkOut: formatarDataISOParaBR(reserva.checkOutDate.split('T')[0]),
     horaCheckOut: reserva.checkOutTime,
     quantidadeHospedes: reserva.guests,
     quantidadeAdultos: reserva.guestsDetails.adults,
@@ -72,15 +79,25 @@ export function transformTaxasReserva(reserva: any, reservaId: number): TaxaRese
 }
 
 export function transformBloqueio(bloqueio: any): BloqueioDetalhado {
+  // 🧠 Define o status do bloqueio com base no tipo
+  let statusBloqueio = "Outro";
+
+  if (bloqueio.type === "blocked") {
+    statusBloqueio = "Bloqueado";
+  } else if (bloqueio.type === "maintenance") {
+    statusBloqueio = "Manutenção";
+  }
+
   return {
-    _id: bloqueio._id, // ID externo único do bloqueio na Stays
-    name: bloqueio.id, // Nome ou identificador do bloqueio
-    checkIn: bloqueio.checkInDate.split('T')[0], // Data de check-in no formato YYYY-MM-DD
-    horaCheckIn: bloqueio.checkInTime ?? null, // Hora de check-in (se disponível)
-    checkOut: bloqueio.checkOutDate.split('T')[0], // Data de check-out no formato YYYY-MM-DD
-    horaCheckOut: bloqueio.checkOutTime ?? null, // Hora de check-out (se disponível)
+    _id: bloqueio._id,                          // ID externo único do bloqueio na Stays
+    name: bloqueio.id,                          // Nome ou identificador do bloqueio
+    checkIn: bloqueio.checkInDate.split('T')[0],// Data de check-in no formato YYYY-MM-DD
+    horaCheckIn: bloqueio.checkInTime ?? null,  // Hora de check-in (se disponível)
+    checkOut: bloqueio.checkOutDate.split('T')[0], // Data de check-out
+    horaCheckOut: bloqueio.checkOutTime ?? null,// Hora de check-out (se disponível)
     notaInterna: bloqueio.internalNote ?? "Sem nota interna", // Nota associada ao bloqueio
-    idImovelStays: bloqueio._idlisting, // ID externo do imóvel na Stays associado ao bloqueio
-    imovelId: null, // Será preenchido posteriormente ao buscar no banco
+    idImovelStays: bloqueio._idlisting,         // ID externo do imóvel associado
+    imovelId: null,                             // Preenchido depois
+    status: statusBloqueio                      // ✅ Status categorizado
   };
 }

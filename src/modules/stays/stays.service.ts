@@ -1,6 +1,6 @@
 import { fetchReservas, fetchHospedeDetalhado, fetchImovelDetalhado, fetchCondominioDetalhado, fetchReservaDetalhada } from './services/fetchService';
 import { transformReserva, transformAgente, transformCanal, transformBloqueio } from './services/transformService';
-import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva, salvarProprietario, salvarBloqueio, salvarAgente, salvarCanal } from "./services/saveService";
+import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTaxasReserva, salvarProprietario, salvarBloqueio, salvarAgente, salvarCanal, obterOuCriarCanalReservaDireta } from "./services/saveService";
 import prisma from "../../config/database"; // Importa o cliente Prisma
 import { logDebug } from '../../utils/logger';
 import { sincronizarReserva } from "../jestor/services/reservas.service";
@@ -24,8 +24,15 @@ export const processWebhookData = async (body: any) => {
       switch (action) {
           case "reservation.created":
           case "reservation.modified":
-              logDebug('Reserva', `Processando ${action} para o ID ${payload._id}`);
-              return payload.type === "blocked"
+
+              logDebug('Reserva', `Processando ${action} para o ID ${payload._id}`); 
+
+              // ✅ Lista de tipos de reserva que devem ser tratados como bloqueios
+              const tiposBloqueio = ["blocked", "maintenance"];
+
+              // 🔁 Se o tipo da reserva estiver na lista de bloqueios, processa como bloqueio
+              // Caso contrário, processa como uma reserva normal
+              return tiposBloqueio.includes(payload.type)
                   ? await processarBloqueioWebhook(payload)
                   : await processarReservaWebhook(payload);
 
@@ -81,6 +88,10 @@ const processarReservaWebhook = async (payload: any) => {
       const resultadoCanal = await salvarCanal(canalData);
       canalId = resultadoCanal.id;
       canalIdJestor = resultadoCanal.jestorId;
+    } else {
+      const canalReservaDireta = await obterOuCriarCanalReservaDireta();
+      canalId = canalReservaDireta.id;
+      canalIdJestor = canalReservaDireta.jestorId;
     }
 
     // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
@@ -90,6 +101,7 @@ const processarReservaWebhook = async (payload: any) => {
     let condominioSku = null;
     let condominioRegiao = null; 
     let condominioIdJestor = null;
+    let condominioTitulo = null;
 
     if (payload._idlisting) {
       const { imovel, proprietario } = await fetchImovelDetalhado(payload._idlisting);
@@ -103,6 +115,7 @@ const processarReservaWebhook = async (payload: any) => {
             const condominioSalvo = await salvarCondominio(condominioDetalhado);
             condominioSku = condominioSalvo.sku;
             condominioRegiao = condominioSalvo.regiao;
+            condominioTitulo = condominioSalvo.titulo;
             condominioIdJestor = condominioSalvo.jestorId;
           }
         }

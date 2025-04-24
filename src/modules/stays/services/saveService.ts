@@ -172,6 +172,7 @@ export async function salvarImovel(imovel: ImovelDetalhado, condominioIdJestor?:
     normalizarTexto(imovelExistente.sku) !== normalizarTexto(imovel.internalName) ||
     normalizarTexto(imovelExistente.status) !== normalizarTexto(imovel.status) ||
     normalizarTexto(imovelExistente.idCondominioStays) !== normalizarTexto(imovel._idproperty) ||
+    normalizarTexto(imovelExistente.regiao) !== normalizarTexto(imovel.regiao) ||
     normalizarNumero(imovelExistente.proprietarioId) !== normalizarNumero(proprietarioId) ||
     normalizarNumero(imovelExistente.condominioIdJestor) !== normalizarNumero(condominioIdJestor) ||
     imovelExistente.jestorId === null || imovelExistente.jestorId === undefined;
@@ -220,6 +221,7 @@ export async function salvarImovel(imovel: ImovelDetalhado, condominioIdJestor?:
       idCondominioStays: imovel._idproperty || null,
       condominioIdJestor: condominioIdJestor ?? null,
       proprietarioId,
+      regiao: imovel.regiao || null, // ✅ NOVO
       sincronizadoNoJestor: false,
     },
     create: {
@@ -230,6 +232,7 @@ export async function salvarImovel(imovel: ImovelDetalhado, condominioIdJestor?:
       idCondominioStays: imovel._idproperty || null,
       condominioIdJestor: condominioIdJestor ?? null,
       proprietarioId,
+      regiao: imovel.regiao || null, // ✅ NOVO
       sincronizadoNoJestor: false,
     },
   });
@@ -454,33 +457,30 @@ export async function salvarTaxasReserva(taxas: TaxaReservaDetalhada[], reservaI
  * @param condominio - Dados detalhados do condomínio a serem salvos ou atualizados.
  * @returns O condomínio salvo no banco de dados.
  */
-export async function salvarCondominio(condominio: CondominioDetalhado): Promise<{ id: number, sku: string | null, regiao: string | null, jestorId: number | null }> {
+export async function salvarCondominio(condominio: CondominioDetalhado): Promise<{ id: number, sku: string | null, regiao: string | null, titulo: string | null, jestorId: number | null }> {
   // 🔹 Busca o condomínio no banco de dados pelo ID externo (_id)
   const condominioExistente = await prisma.condominio.findUnique({
     where: { idExterno: condominio._id },
   });
 
-  // 🔍 Normaliza valores antes da comparação
   const normalizarTexto = (texto: string | null | undefined) => texto?.trim().toLowerCase() || '';
 
-  // 🔍 Verifica se há diferenças
   const precisaAtualizar =
     !condominioExistente ||
     normalizarTexto(condominioExistente.idStays) !== normalizarTexto(condominio.id) ||
     normalizarTexto(condominioExistente.sku) !== normalizarTexto(condominio.internalName) ||
     normalizarTexto(condominioExistente.regiao) !== normalizarTexto(condominio.regiao) ||
     normalizarTexto(condominioExistente.status) !== normalizarTexto(condominio.status) ||
+    normalizarTexto(condominioExistente.titulo) !== normalizarTexto(condominio.titulo) ||
     condominioExistente.jestorId === null || condominioExistente.jestorId === undefined;
 
   let jestorIdAtualizado: number | null = condominioExistente?.jestorId ?? null;
-
 
   if (!precisaAtualizar) {
     logDebug('Condominio', `Nenhuma mudança detectada para condomínio ${condominio._id}. Nenhuma atualização no banco foi realizada.`);
 
     if (condominioExistente && !condominioExistente.sincronizadoNoJestor) {
       try {
-
         logDebug('Condominio', `🔄 Sincronizando condomínio ${condominio._id} no Jestor.`);
         jestorIdAtualizado = await sincronizarCondominio(condominioExistente);
 
@@ -503,11 +503,11 @@ export async function salvarCondominio(condominio: CondominioDetalhado): Promise
       id: condominioExistente!.id,
       sku: condominioExistente!.sku ?? null,
       regiao: condominioExistente!.regiao ?? null,
+      titulo: condominioExistente!.titulo ?? null,
       jestorId: jestorIdAtualizado ?? null,
     };
   }
 
-  // ✅ Atualiza ou cria o condomínio no banco
   logDebug('Condominio', `🚨 Atualizando condomínio ${condominio._id} no banco.`);
 
   const condominioSalvo = await prisma.condominio.upsert({
@@ -517,6 +517,7 @@ export async function salvarCondominio(condominio: CondominioDetalhado): Promise
       sku: condominio.internalName,
       regiao: condominio.regiao,
       status: condominio.status,
+      titulo: condominio.titulo,
       sincronizadoNoJestor: false,
     },
     create: {
@@ -525,12 +526,12 @@ export async function salvarCondominio(condominio: CondominioDetalhado): Promise
       sku: condominio.internalName,
       regiao: condominio.regiao,
       status: condominio.status,
+      titulo: condominio.titulo,
       sincronizadoNoJestor: false,
     },
   });
 
   try {
-
     jestorIdAtualizado = await sincronizarCondominio(condominioSalvo);
 
     if (jestorIdAtualizado) {
@@ -553,6 +554,7 @@ export async function salvarCondominio(condominio: CondominioDetalhado): Promise
     id: condominioSalvo.id,
     sku: condominioSalvo.sku ?? null,
     regiao: condominioSalvo.regiao ?? null,
+    titulo: condominioSalvo.titulo ?? null,
     jestorId: jestorIdAtualizado ?? null,
   };
 }
@@ -676,6 +678,8 @@ export async function salvarBloqueio(bloqueio: BloqueioDetalhado) {
       where: { idExterno: bloqueio._id },
     });
 
+    let jestorIdAtualizado: number | null = bloqueioExistente?.jestorId ?? null;
+
     // 🔹 Define se a atualização é necessária comparando os valores existentes com os novos
     const precisaAtualizar =
       !bloqueioExistente ||
@@ -686,7 +690,9 @@ export async function salvarBloqueio(bloqueio: BloqueioDetalhado) {
       bloqueioExistente.horaCheckOut !== (bloqueio.horaCheckOut ?? null) ||
       bloqueioExistente.notaInterna !== (bloqueio.notaInterna || 'Sem nota interna') ||
       normalizarNumero(bloqueioExistente.imovelId) !== normalizarNumero(bloqueio.imovelId) ||
-      normalizarNumero(bloqueioExistente.imovelIdJestor) !== normalizarNumero(imovelIdJestor);
+      normalizarNumero(bloqueioExistente.imovelIdJestor) !== normalizarNumero(imovelIdJestor) ||
+      normalizarTexto(bloqueioExistente.status) !== normalizarTexto(bloqueio.status) ||
+      bloqueioExistente.jestorId === null || bloqueioExistente.jestorId === undefined;
 
       if (!precisaAtualizar) {
         logDebug('Bloqueio', `Nenhuma mudança detectada para bloqueio ${bloqueio._id}. Nenhuma atualização no banco foi realizada.`);
@@ -699,7 +705,10 @@ export async function salvarBloqueio(bloqueio: BloqueioDetalhado) {
   
             await prisma.bloqueio.update({
               where: { id: bloqueioExistente.id },
-              data: { sincronizadoNoJestor: true },
+              data: {
+                jestorId: jestorIdAtualizado,
+                sincronizadoNoJestor: true,
+              },
             });
           } catch (error: any) {
             const errorMessage = error.message || 'Erro desconhecido';
@@ -726,6 +735,8 @@ export async function salvarBloqueio(bloqueio: BloqueioDetalhado) {
         notaInterna: bloqueio.notaInterna || 'Sem nota interna',
         imovelId: bloqueio.imovelId ?? null,
         imovelIdJestor: imovelIdJestor ?? null,
+        status: bloqueio.status,
+        jestorId: jestorIdAtualizado,
         sincronizadoNoJestor: false,
       },
       create: {
@@ -738,6 +749,8 @@ export async function salvarBloqueio(bloqueio: BloqueioDetalhado) {
         notaInterna: bloqueio.notaInterna || 'Sem nota interna',
         imovelId: bloqueio.imovelId ?? null,
         imovelIdJestor: imovelIdJestor ?? null,
+        status: bloqueio.status,
+        jestorId: jestorIdAtualizado,
         sincronizadoNoJestor: false,
       },
     });
@@ -747,10 +760,15 @@ export async function salvarBloqueio(bloqueio: BloqueioDetalhado) {
       await sincronizarBloqueio(bloqueioSalvo, imovelIdJestor ?? undefined); // 👈 envia imovelIdJestor
 
       // ✅ Atualiza o campo `sincronizadoNoJestor` se a sincronização for bem-sucedida
-      await prisma.bloqueio.update({
-        where: { id: bloqueioSalvo.id },
-        data: { sincronizadoNoJestor: true },
-      });
+      if (jestorIdAtualizado) {
+        await prisma.bloqueio.update({
+          where: { id: bloqueioSalvo.id },
+          data: {
+            jestorId: jestorIdAtualizado,
+            sincronizadoNoJestor: true,
+          },
+        });
+      }
     } catch (error: any) {
       const errorMessage = error.message || 'Erro desconhecido';
       logDebug('Erro', `❌ Erro ao sincronizar bloqueio ${bloqueioSalvo.idExterno} com Jestor: ${errorMessage}`);
@@ -849,6 +867,56 @@ export async function salvarCanal(canal: CanalDetalhado): Promise<{ id: number, 
   }
 
   return { id: canalSalvo.id, jestorId: jestorIdAtualizado };
+}
+
+
+
+export async function obterOuCriarCanalReservaDireta(): Promise<{ id: number, jestorId: number | null }> {
+  const idExternoReservaDireta = 'reserva_direta';
+
+  let canalExistente = await prisma.canal.findUnique({
+    where: { idExterno: idExternoReservaDireta },
+  });
+
+  if (canalExistente) {
+    return {
+      id: canalExistente.id,
+      jestorId: canalExistente.jestorId ?? null,
+    };
+  }
+
+  const canalSalvo = await prisma.canal.create({
+    data: {
+      idExterno: idExternoReservaDireta,
+      titulo: 'Reserva Direta',
+      sincronizadoNoJestor: false,
+    },
+  });
+
+  try {
+    const jestorId = await sincronizarCanal(canalSalvo);
+
+    await prisma.canal.update({
+      where: { id: canalSalvo.id },
+      data: {
+        jestorId,
+        sincronizadoNoJestor: true,
+      },
+    });
+
+    return {
+      id: canalSalvo.id,
+      jestorId,
+    };
+  } catch (error: any) {
+    const errorMessage = error.message || 'Erro desconhecido';
+    logDebug('Erro', `❌ Erro ao sincronizar canal Reserva Direta: ${errorMessage}`);
+    await registrarErroJestor('canal', canalSalvo.id.toString(), errorMessage);
+    return {
+      id: canalSalvo.id,
+      jestorId: null,
+    };
+  }
 }
 
 

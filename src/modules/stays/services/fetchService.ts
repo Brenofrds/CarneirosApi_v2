@@ -121,6 +121,7 @@ export async function fetchImovelDetalhado(listingId: string): Promise<{ imovel:
       internalName: data.internalName, // Nome interno ou SKU do imóvel
       status: STATUS_MAP[data.status] || "Oculto", // Traduz o status ou usa "Oculto" por padrão
       _idproperty: data._idproperty, // ID externo do condomínio relacionado
+      regiao: data.address?.region || "Região não especificada",
     };
 
     // 🔹 Extrair dados do proprietário (se existirem na resposta)
@@ -165,7 +166,8 @@ export async function fetchCondominioDetalhado(condominioId: string): Promise<Co
       id: data.id, // ID interno na Stays
       internalName: data.internalName, // Nome interno ou SKU do condomínio
       regiao: data.address?.region || "Região não especificada", // Região do condomínio
-      status: statusMap[data.status] || "Oculto" // Traduz o status ou usa "Oculto" por padrão
+      status: statusMap[data.status] || "Oculto", // Traduz o status ou usa "Oculto" por padrão
+      titulo: data._mstitle?.pt_BR || "Título não especificado"
     };
 
     return condominioDetalhado;

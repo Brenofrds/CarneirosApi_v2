@@ -66,10 +66,7 @@ export async function inserirProprietarioNoJestor(proprietario: typeProprietario
 
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
-        logDebug('Erro', `❌ Erro ao inserir proprietário ${proprietario.nome} no Jestor: ${errorMessage}`);
-        
-        await registrarErroJestor('proprietario', proprietario.id.toString(), errorMessage);
-        
+        logDebug('Erro', `❌ Erro ao inserir proprietário ${proprietario.nome} no Jestor: ${errorMessage}`);        
         throw new Error(`Erro ao inserir proprietário ${proprietario.nome} no Jestor`);
     }
 }
@@ -102,11 +99,7 @@ export async function atualizarProprietarioNoJestor(proprietario: typeProprietar
 
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
-        
-        logDebug('Erro', `❌ Erro ao atualizar proprietário ${proprietario.nome} no Jestor: ${errorMessage}`);
-        
-        await registrarErroJestor("proprietario", proprietario.id.toString(), errorMessage);
-        
+        logDebug('Erro', `❌ Erro ao atualizar proprietário ${proprietario.nome} no Jestor: ${errorMessage}`);        
         throw new Error(`Erro ao atualizar proprietário ${proprietario.nome} no Jestor`);
     }
 }

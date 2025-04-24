@@ -49,34 +49,30 @@ export async function obterIdInternoCondominioNoJestor(idExterno: string, sku: s
  */
 export async function inserirCondominioNoJestor(condominio: typeCondominio) {
     try {
-        const data: Record<string, any> = {
-            idbdengnet: condominio.id,
-            idexterno: condominio.idExterno,
-            idstays: condominio.idStays,
-            skuinternalname: condominio.sku,
-            regiao: condominio.regiao,
-            status_1: condominio.status, 
-        };
-
-        const response = await jestorClient.post(ENDPOINT_CREATE, {
-            object_type: JESTOR_TB_CONDOMINIO,
-            data,
-        });
-
-        logDebug('Condomínio', `✅ Condomínio ${condominio.idExterno} inserido com sucesso no Jestor!`);
-
-        return response.data;
-
+      const data: Record<string, any> = {
+        idbdengnet: condominio.id,
+        idexterno: condominio.idExterno,
+        idstays: condominio.idStays,
+        skuinternalname: condominio.sku,
+        regiao: condominio.regiao,
+        status_1: condominio.status,
+        titulo: condominio.titulo || '',
+      };
+  
+      const response = await jestorClient.post(ENDPOINT_CREATE, {
+        object_type: JESTOR_TB_CONDOMINIO,
+        data,
+      });
+  
+      logDebug('Condomínio', `✅ Condomínio ${condominio.idExterno} inserido com sucesso no Jestor!`);
+      return response.data;
+  
     } catch (error: any) {
-        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
-        logDebug('Erro', `❌ Erro ao inserir condomínio ${condominio.idExterno} no Jestor: ${errorMessage}`);
-        
-        // 🔥 Registra o erro na tabela de sincronização
-        await registrarErroJestor('condominio', condominio.idExterno, errorMessage);
-        
-        throw new Error(`Erro ao inserir condomínio ${condominio.idExterno} no Jestor`);
+      const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao inserir condomínio ${condominio.idExterno} no Jestor: ${errorMessage}`);
+      throw new Error(`Erro ao inserir condomínio ${condominio.idExterno} no Jestor`);
     }
-}
+  }
 
 /**
  * Atualiza um condomínio existente no Jestor.
@@ -85,38 +81,35 @@ export async function inserirCondominioNoJestor(condominio: typeCondominio) {
  */
 export async function atualizarCondominioNoJestor(condominio: typeCondominio, idInterno: string) {
     try {
-        const data: Record<string, any> = {
-            object_type: JESTOR_TB_CONDOMINIO,
-            data: {
-                [`id_${JESTOR_TB_CONDOMINIO}`]: idInterno,
-                idexterno: condominio.idExterno,
-                idstays: condominio.idStays,
-                skuinternalname: condominio.sku,
-                regiao: condominio.regiao,
-                status_1: condominio.status,
-            }
-        };
-
-        const response = await jestorClient.post(ENDPOINT_UPDATE, data);
-
-        if (response.data?.status) {
-            logDebug('Condomínio', `🔹 Condomínio ${condominio.idExterno} atualizado com sucesso no Jestor!`);
-        } else {
-            logDebug('Condomínio', `⚠️ Atualização do condomínio ${condominio.idExterno} no Jestor retornou um status inesperado.`);
+      const data: Record<string, any> = {
+        object_type: JESTOR_TB_CONDOMINIO,
+        data: {
+          [`id_${JESTOR_TB_CONDOMINIO}`]: idInterno,
+          idexterno: condominio.idExterno,
+          idstays: condominio.idStays,
+          skuinternalname: condominio.sku,
+          regiao: condominio.regiao,
+          status_1: condominio.status,
+          titulo: condominio.titulo || '',
         }
-
-        return response.data;
-
+      };
+  
+      const response = await jestorClient.post(ENDPOINT_UPDATE, data);
+  
+      if (response.data?.status) {
+        logDebug('Condomínio', `🔹 Condomínio ${condominio.idExterno} atualizado com sucesso no Jestor!`);
+      } else {
+        logDebug('Condomínio', `⚠️ Atualização do condomínio ${condominio.idExterno} no Jestor retornou um status inesperado.`);
+      }
+  
+      return response.data;
+  
     } catch (error: any) {
-        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
-
-        logDebug('Erro', `❌ Erro ao atualizar condomínio ${condominio.idExterno} no Jestor: ${errorMessage}`);
-        
-        await registrarErroJestor("condominio", condominio.idExterno, errorMessage);
-        
-        throw new Error(`Erro ao atualizar condomínio ${condominio.idExterno} no Jestor`);
+      const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao atualizar condomínio ${condominio.idExterno} no Jestor: ${errorMessage}`);
+      throw new Error(`Erro ao atualizar condomínio ${condominio.idExterno} no Jestor`);
     }
-}
+  }
 
 /**
  * Sincroniza apenas UM condomínio específico com o Jestor.

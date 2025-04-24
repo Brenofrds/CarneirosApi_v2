@@ -55,6 +55,7 @@ export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio, imovelIdJe
             imovelid: bloqueio.imovelId,
             imovel: bloqueio.imovelId,
             imovel_1: imovelIdJestor,
+            status: bloqueio.status,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -68,8 +69,9 @@ export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio, imovelIdJe
 
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        
         logDebug('Erro', `❌ Erro ao inserir bloqueio ${bloqueio.idExterno} no Jestor: ${errorMessage}`);
-        await registrarErroJestor('bloqueio', bloqueio.idExterno, errorMessage);
+
         throw new Error(`Erro ao inserir bloqueio ${bloqueio.idExterno} no Jestor`);
     }
 }
@@ -98,6 +100,7 @@ export async function atualizarBloqueioNoJestor(bloqueio: typeBloqueio, idIntern
                 imovelid: bloqueio.imovelId,
                 imovel: bloqueio.imovelId,
                 imovel_1: imovelIdJestor,
+                status: bloqueio.status,
             },
         };
 
@@ -112,8 +115,6 @@ export async function atualizarBloqueioNoJestor(bloqueio: typeBloqueio, idIntern
 
         logDebug('Erro', `❌ Erro ao atualizar bloqueio ${bloqueio.idExterno} no Jestor: ${errorMessage}`);
 
-        await registrarErroJestor('bloqueio', bloqueio.idExterno, errorMessage);
-
         throw new Error(`Erro ao atualizar bloqueio ${bloqueio.idExterno} no Jestor`);
     }
 }
@@ -121,26 +122,44 @@ export async function atualizarBloqueioNoJestor(bloqueio: typeBloqueio, idIntern
 /**
  * Sincroniza apenas UM bloqueio específico com o Jestor.
  */
-export async function sincronizarBloqueio(bloqueio: typeBloqueio, imovelIdJestor?: number) {
+export async function sincronizarBloqueio(bloqueio: typeBloqueio, imovelIdJestor?: number): Promise<number | null> {
     try {
-        const idInterno = await obterIdInternoBloqueioNoJestor(bloqueio.idExterno);
-
-        if (!idInterno) {
-            await inserirBloqueioNoJestor(bloqueio, imovelIdJestor);
-        } else {
-            await atualizarBloqueioNoJestor(bloqueio, idInterno, imovelIdJestor);
-        }
-
+      let idInterno: number | null = bloqueio.jestorId || null;
+  
+      // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
+      if (!idInterno) {
+        idInterno = await obterIdInternoBloqueioNoJestor(bloqueio.idExterno);
+      }
+  
+      // 🚀 Decide entre inserir ou atualizar
+      if (!idInterno) {
+        const response = await inserirBloqueioNoJestor(bloqueio, imovelIdJestor);
+        idInterno = response?.data?.[`id_${JESTOR_TB_BLOQUEIO}`];
+      } else {
+        await atualizarBloqueioNoJestor(bloqueio, idInterno.toString(), imovelIdJestor);
+      }
+  
+      // 🟢 Atualiza sincronização no banco
+      await prisma.bloqueio.update({
+        where: { idExterno: bloqueio.idExterno },
+        data: {
+          sincronizadoNoJestor: true,
+          jestorId: idInterno,
+        },
+      });
+  
+      return idInterno;
+  
     } catch (error: any) {
-        const errorMessage = error.message || 'Erro desconhecido';
-
-        logDebug('Erro', `❌ Erro ao sincronizar bloqueio ${bloqueio.idExterno}: ${errorMessage}`);
-
-        await prisma.bloqueio.update({
-            where: { idExterno: bloqueio.idExterno },
-            data: { sincronizadoNoJestor: false },
-        });
-
-        throw new Error(`Erro ao sincronizar bloqueio ${bloqueio.idExterno}`);
+      const errorMessage = error.message || 'Erro desconhecido';
+  
+      logDebug('Erro', `❌ Erro ao sincronizar bloqueio ${bloqueio.idExterno}: ${errorMessage}`);
+  
+      await prisma.bloqueio.update({
+        where: { idExterno: bloqueio.idExterno },
+        data: { sincronizadoNoJestor: false },
+      });
+  
+      throw new Error(`Erro ao sincronizar bloqueio ${bloqueio.idExterno}`);
     }
-}
+  }

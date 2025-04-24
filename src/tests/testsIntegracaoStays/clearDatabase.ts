@@ -1,24 +1,37 @@
 import prisma from '../../config/database'; // Certifique-se de que o caminho está correto
 
-/**
- * Apaga todos os registros do banco de dados em todas as tabelas.
- * Essa função é apenas para fins de teste ou desenvolvimento.
- */
-async function clearDatabase() {
+
+async function limparBanco() {
   try {
-    console.log('Iniciando limpeza do banco de dados...');
+    console.log('🧹 Limpando o banco de dados...');
 
-    // Ordem de exclusão para respeitar as relações
-    await prisma.erroSincronizacaoJestor.deleteMany({});
-    await prisma.erroSincronizacaoStays.deleteMany({});
+    // Tabelas sem dependências primeiro
+    await prisma.erroSincronizacaoStays.deleteMany();
+    await prisma.erroSincronizacaoJestor.deleteMany();
 
-    console.log('Banco de dados limpo com sucesso!');
-  } catch (error) {
-    console.error('Erro ao limpar o banco de dados:', error);
+    // Tabelas com dependência de reserva
+    await prisma.taxaReserva.deleteMany();
+    await prisma.hospede.deleteMany();
+
+    // Tabelas com dependência de imóvel
+    await prisma.bloqueio.deleteMany();
+    await prisma.reserva.deleteMany();
+
+    // Tabelas de relacionamento principais
+    await prisma.imovel.deleteMany();
+    await prisma.condominio.deleteMany();
+    await prisma.proprietario.deleteMany();
+
+    // Tabelas independentes restantes
+    await prisma.agente.deleteMany();
+    await prisma.canal.deleteMany();
+
+    console.log('✅ Banco de dados limpo com sucesso!');
+  } catch (error: any) {
+    console.error('❌ Erro ao limpar o banco de dados:', error.message);
   } finally {
-    await prisma.$disconnect(); // Sempre desconectar o cliente Prisma
+    await prisma.$disconnect();
   }
 }
 
-// Executar o script
-clearDatabase();
+limparBanco();

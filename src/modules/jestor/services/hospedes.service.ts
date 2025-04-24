@@ -81,11 +81,7 @@ export async function inserirHospedeNoJestor(hospede: typeHospede, reservaIdJest
 
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
-        logDebug('Erro', `❌ Erro ao inserir hóspede ${hospede.nomeCompleto} no Jestor: ${errorMessage}`);
-        
-        // 🔥 Registra o erro na tabela de sincronização
-        await registrarErroJestor('hospede', hospede.idExterno || '', errorMessage);
-        
+        logDebug('Erro', `❌ Erro ao inserir hóspede ${hospede.nomeCompleto} no Jestor: ${errorMessage}`);        
         throw new Error(`Erro ao inserir hóspede ${hospede.nomeCompleto} no Jestor`);
     }
 }
@@ -126,12 +122,7 @@ export async function atualizarHospedeNoJestor(hospede: typeHospede, idInterno: 
 
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
-        
-        logDebug('Erro', `❌ Erro ao atualizar hóspede ${hospede.nomeCompleto} no Jestor: ${errorMessage}`);
-
-        // 🔥 Registra erro na tabela ErroSincronizacao
-        await registrarErroJestor("hospede", hospede.idExterno || '', errorMessage);
-        
+        logDebug('Erro', `❌ Erro ao atualizar hóspede ${hospede.nomeCompleto} no Jestor: ${errorMessage}`);        
         throw new Error(`Erro ao atualizar hóspede ${hospede.nomeCompleto} no Jestor`);
     }
 }

@@ -56,6 +56,7 @@ export async function inserirImovelNoJestor(imovel: typeImovel, condominioIdJest
             sku: imovel.sku,
             status_2: imovel.status,
             idcondominiostays: imovel.idCondominioStays || null,
+            regiao: imovel.regiao || null,
             proprietario_id: imovel.proprietarioId || null, // ✅ Agora enviamos também o ID do proprietário
             condominio: condominioIdJestor || null, 
             proprietario: proprietarioIdJestor || null,
@@ -72,11 +73,7 @@ export async function inserirImovelNoJestor(imovel: typeImovel, condominioIdJest
 
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
-        logDebug('Erro', `❌ Erro ao inserir imóvel ${imovel.idExterno} no Jestor: ${errorMessage}`);
-        
-        // 🔥 Registra o erro na tabela de sincronização
-        await registrarErroJestor('imovel', imovel.idExterno, errorMessage);
-        
+        logDebug('Erro', `❌ Erro ao inserir imóvel ${imovel.idExterno} no Jestor: ${errorMessage}`);        
         throw new Error(`Erro ao inserir imóvel ${imovel.idExterno} no Jestor`);
     }
 }
@@ -97,6 +94,7 @@ export async function atualizarImovelNoJestor(imovel: typeImovel, idInterno: str
                 sku: imovel.sku,
                 status_2: imovel.status,
                 idcondominiostays: imovel.idCondominioStays || null,
+                regiao: imovel.regiao || null,
                 proprietario_id: imovel.proprietarioId || null,
                 condominio: condominioIdJestor || null, 
                 proprietario: proprietarioIdJestor || null,
@@ -119,9 +117,6 @@ export async function atualizarImovelNoJestor(imovel: typeImovel, idInterno: str
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
         
         logDebug('Erro', `❌ Erro ao atualizar imóvel ${imovel.idExterno} no Jestor: ${errorMessage}`);
-
-        // 🔥 Registra erro na tabela ErroSincronizacao
-        await registrarErroJestor("imovel", imovel.idExterno.toString(), errorMessage);
         
         throw new Error(`Erro ao atualizar imóvel ${imovel.idExterno} no Jestor`);
     }

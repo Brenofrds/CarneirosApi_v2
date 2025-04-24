@@ -63,7 +63,6 @@ export async function inserirAgenteNoJestor(agente: typeAgente) {
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
         logDebug('Erro', `❌ Erro ao inserir agente ${agente.idExterno} no Jestor: ${errorMessage}`);
-        await registrarErroJestor('agente', agente.idExterno, errorMessage);
         throw new Error(`Erro ao inserir agente ${agente.idExterno} no Jestor`);
     }
 }
@@ -92,7 +91,6 @@ export async function atualizarAgenteNoJestor(agente: typeAgente, idInterno: str
     } catch (error: any) {
         const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
         logDebug('Erro', `❌ Erro ao atualizar agente ${agente.idExterno} no Jestor: ${errorMessage}`);
-        await registrarErroJestor('agente', agente.idExterno, errorMessage);
         throw new Error(`Erro ao atualizar agente ${agente.idExterno} no Jestor`);
     }
 }
