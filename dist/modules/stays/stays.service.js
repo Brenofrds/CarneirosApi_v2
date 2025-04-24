@@ -35,7 +35,11 @@ const processWebhookData = (body) => __awaiter(void 0, void 0, void 0, function*
             case "reservation.created":
             case "reservation.modified":
                 (0, logger_1.logDebug)('Reserva', `Processando ${action} para o ID ${payload._id}`);
-                return payload.type === "blocked"
+                // ✅ Lista de tipos de reserva que devem ser tratados como bloqueios
+                const tiposBloqueio = ["blocked", "maintenance"];
+                // 🔁 Se o tipo da reserva estiver na lista de bloqueios, processa como bloqueio
+                // Caso contrário, processa como uma reserva normal
+                return tiposBloqueio.includes(payload.type)
                     ? yield (0, exports.processarBloqueioWebhook)(payload)
                     : yield processarReservaWebhook(payload);
             case "reservation.canceled":
@@ -81,6 +85,11 @@ const processarReservaWebhook = (payload) => __awaiter(void 0, void 0, void 0, f
             canalId = resultadoCanal.id;
             canalIdJestor = resultadoCanal.jestorId;
         }
+        else {
+            const canalReservaDireta = yield (0, saveService_1.obterOuCriarCanalReservaDireta)();
+            canalId = canalReservaDireta.id;
+            canalIdJestor = canalReservaDireta.jestorId;
+        }
         // 🔹 Buscar e salvar Imóvel e Proprietário primeiro
         let imovelId = null;
         let imovelSku = null;
@@ -88,6 +97,7 @@ const processarReservaWebhook = (payload) => __awaiter(void 0, void 0, void 0, f
         let condominioSku = null;
         let condominioRegiao = null;
         let condominioIdJestor = null;
+        let condominioTitulo = null;
         if (payload._idlisting) {
             const { imovel, proprietario } = yield (0, fetchService_1.fetchImovelDetalhado)(payload._idlisting);
             if (imovel) {
@@ -98,6 +108,7 @@ const processarReservaWebhook = (payload) => __awaiter(void 0, void 0, void 0, f
                         const condominioSalvo = yield (0, saveService_1.salvarCondominio)(condominioDetalhado);
                         condominioSku = condominioSalvo.sku;
                         condominioRegiao = condominioSalvo.regiao;
+                        condominioTitulo = condominioSalvo.titulo;
                         condominioIdJestor = condominioSalvo.jestorId;
                     }
                 }

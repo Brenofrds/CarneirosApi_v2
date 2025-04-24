@@ -31,6 +31,7 @@ exports.salvarCondominio = salvarCondominio;
 exports.salvarProprietario = salvarProprietario;
 exports.salvarBloqueio = salvarBloqueio;
 exports.salvarCanal = salvarCanal;
+exports.obterOuCriarCanalReservaDireta = obterOuCriarCanalReservaDireta;
 exports.salvarAgente = salvarAgente;
 const database_1 = __importDefault(require("../../../config/database"));
 const erro_service_1 = require("../../database/erro.service"); // Importa a função que salva erros
@@ -169,6 +170,7 @@ function salvarImovel(imovel, condominioIdJestor) {
             normalizarTexto(imovelExistente.sku) !== normalizarTexto(imovel.internalName) ||
             normalizarTexto(imovelExistente.status) !== normalizarTexto(imovel.status) ||
             normalizarTexto(imovelExistente.idCondominioStays) !== normalizarTexto(imovel._idproperty) ||
+            normalizarTexto(imovelExistente.regiao) !== normalizarTexto(imovel.regiao) ||
             normalizarNumero(imovelExistente.proprietarioId) !== normalizarNumero(proprietarioId) ||
             normalizarNumero(imovelExistente.condominioIdJestor) !== normalizarNumero(condominioIdJestor) ||
             imovelExistente.jestorId === null || imovelExistente.jestorId === undefined;
@@ -211,6 +213,7 @@ function salvarImovel(imovel, condominioIdJestor) {
                 idCondominioStays: imovel._idproperty || null,
                 condominioIdJestor: condominioIdJestor !== null && condominioIdJestor !== void 0 ? condominioIdJestor : null,
                 proprietarioId,
+                regiao: imovel.regiao || null, // ✅ NOVO
                 sincronizadoNoJestor: false,
             },
             create: {
@@ -221,6 +224,7 @@ function salvarImovel(imovel, condominioIdJestor) {
                 idCondominioStays: imovel._idproperty || null,
                 condominioIdJestor: condominioIdJestor !== null && condominioIdJestor !== void 0 ? condominioIdJestor : null,
                 proprietarioId,
+                regiao: imovel.regiao || null, // ✅ NOVO
                 sincronizadoNoJestor: false,
             },
         });
@@ -418,19 +422,18 @@ function salvarTaxasReserva(taxas, reservaIdJestor) {
  */
 function salvarCondominio(condominio) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f, _g;
         // 🔹 Busca o condomínio no banco de dados pelo ID externo (_id)
         const condominioExistente = yield database_1.default.condominio.findUnique({
             where: { idExterno: condominio._id },
         });
-        // 🔍 Normaliza valores antes da comparação
         const normalizarTexto = (texto) => (texto === null || texto === void 0 ? void 0 : texto.trim().toLowerCase()) || '';
-        // 🔍 Verifica se há diferenças
         const precisaAtualizar = !condominioExistente ||
             normalizarTexto(condominioExistente.idStays) !== normalizarTexto(condominio.id) ||
             normalizarTexto(condominioExistente.sku) !== normalizarTexto(condominio.internalName) ||
             normalizarTexto(condominioExistente.regiao) !== normalizarTexto(condominio.regiao) ||
             normalizarTexto(condominioExistente.status) !== normalizarTexto(condominio.status) ||
+            normalizarTexto(condominioExistente.titulo) !== normalizarTexto(condominio.titulo) ||
             condominioExistente.jestorId === null || condominioExistente.jestorId === undefined;
         let jestorIdAtualizado = (_a = condominioExistente === null || condominioExistente === void 0 ? void 0 : condominioExistente.jestorId) !== null && _a !== void 0 ? _a : null;
         if (!precisaAtualizar) {
@@ -457,10 +460,10 @@ function salvarCondominio(condominio) {
                 id: condominioExistente.id,
                 sku: (_b = condominioExistente.sku) !== null && _b !== void 0 ? _b : null,
                 regiao: (_c = condominioExistente.regiao) !== null && _c !== void 0 ? _c : null,
+                titulo: (_d = condominioExistente.titulo) !== null && _d !== void 0 ? _d : null,
                 jestorId: jestorIdAtualizado !== null && jestorIdAtualizado !== void 0 ? jestorIdAtualizado : null,
             };
         }
-        // ✅ Atualiza ou cria o condomínio no banco
         (0, logger_1.logDebug)('Condominio', `🚨 Atualizando condomínio ${condominio._id} no banco.`);
         const condominioSalvo = yield database_1.default.condominio.upsert({
             where: { idExterno: condominio._id },
@@ -469,6 +472,7 @@ function salvarCondominio(condominio) {
                 sku: condominio.internalName,
                 regiao: condominio.regiao,
                 status: condominio.status,
+                titulo: condominio.titulo,
                 sincronizadoNoJestor: false,
             },
             create: {
@@ -477,6 +481,7 @@ function salvarCondominio(condominio) {
                 sku: condominio.internalName,
                 regiao: condominio.regiao,
                 status: condominio.status,
+                titulo: condominio.titulo,
                 sincronizadoNoJestor: false,
             },
         });
@@ -499,8 +504,9 @@ function salvarCondominio(condominio) {
         }
         return {
             id: condominioSalvo.id,
-            sku: (_d = condominioSalvo.sku) !== null && _d !== void 0 ? _d : null,
-            regiao: (_e = condominioSalvo.regiao) !== null && _e !== void 0 ? _e : null,
+            sku: (_e = condominioSalvo.sku) !== null && _e !== void 0 ? _e : null,
+            regiao: (_f = condominioSalvo.regiao) !== null && _f !== void 0 ? _f : null,
+            titulo: (_g = condominioSalvo.titulo) !== null && _g !== void 0 ? _g : null,
             jestorId: jestorIdAtualizado !== null && jestorIdAtualizado !== void 0 ? jestorIdAtualizado : null,
         };
     });
@@ -599,7 +605,7 @@ function salvarProprietario(nome, telefone) {
  */
 function salvarBloqueio(bloqueio) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j;
         try {
             console.log(`📌 Salvando bloqueio: ${bloqueio._id}`);
             const normalizarTexto = (texto) => (texto === null || texto === void 0 ? void 0 : texto.trim().toLowerCase()) || '';
@@ -609,16 +615,19 @@ function salvarBloqueio(bloqueio) {
             const bloqueioExistente = yield database_1.default.bloqueio.findUnique({
                 where: { idExterno: bloqueio._id },
             });
+            let jestorIdAtualizado = (_a = bloqueioExistente === null || bloqueioExistente === void 0 ? void 0 : bloqueioExistente.jestorId) !== null && _a !== void 0 ? _a : null;
             // 🔹 Define se a atualização é necessária comparando os valores existentes com os novos
             const precisaAtualizar = !bloqueioExistente ||
                 bloqueioExistente.localizador !== bloqueio.name ||
                 bloqueioExistente.checkIn !== bloqueio.checkIn ||
                 bloqueioExistente.checkOut !== bloqueio.checkOut ||
-                bloqueioExistente.horaCheckIn !== ((_a = bloqueio.horaCheckIn) !== null && _a !== void 0 ? _a : null) ||
-                bloqueioExistente.horaCheckOut !== ((_b = bloqueio.horaCheckOut) !== null && _b !== void 0 ? _b : null) ||
+                bloqueioExistente.horaCheckIn !== ((_b = bloqueio.horaCheckIn) !== null && _b !== void 0 ? _b : null) ||
+                bloqueioExistente.horaCheckOut !== ((_c = bloqueio.horaCheckOut) !== null && _c !== void 0 ? _c : null) ||
                 bloqueioExistente.notaInterna !== (bloqueio.notaInterna || 'Sem nota interna') ||
                 normalizarNumero(bloqueioExistente.imovelId) !== normalizarNumero(bloqueio.imovelId) ||
-                normalizarNumero(bloqueioExistente.imovelIdJestor) !== normalizarNumero(imovelIdJestor);
+                normalizarNumero(bloqueioExistente.imovelIdJestor) !== normalizarNumero(imovelIdJestor) ||
+                normalizarTexto(bloqueioExistente.status) !== normalizarTexto(bloqueio.status) ||
+                bloqueioExistente.jestorId === null || bloqueioExistente.jestorId === undefined;
             if (!precisaAtualizar) {
                 (0, logger_1.logDebug)('Bloqueio', `Nenhuma mudança detectada para bloqueio ${bloqueio._id}. Nenhuma atualização no banco foi realizada.`);
                 (0, logger_1.logDebug)('Bloqueio', `Status de sincronização atual no banco: ${bloqueioExistente === null || bloqueioExistente === void 0 ? void 0 : bloqueioExistente.sincronizadoNoJestor}`);
@@ -628,7 +637,10 @@ function salvarBloqueio(bloqueio) {
                         yield (0, bloqueios_service_1.sincronizarBloqueio)(bloqueioExistente, imovelIdJestor !== null && imovelIdJestor !== void 0 ? imovelIdJestor : undefined);
                         yield database_1.default.bloqueio.update({
                             where: { id: bloqueioExistente.id },
-                            data: { sincronizadoNoJestor: true },
+                            data: {
+                                jestorId: jestorIdAtualizado,
+                                sincronizadoNoJestor: true,
+                            },
                         });
                     }
                     catch (error) {
@@ -648,11 +660,13 @@ function salvarBloqueio(bloqueio) {
                     localizador: bloqueio.name,
                     checkIn: bloqueio.checkIn,
                     checkOut: bloqueio.checkOut,
-                    horaCheckIn: (_c = bloqueio.horaCheckIn) !== null && _c !== void 0 ? _c : null,
-                    horaCheckOut: (_d = bloqueio.horaCheckOut) !== null && _d !== void 0 ? _d : null,
+                    horaCheckIn: (_d = bloqueio.horaCheckIn) !== null && _d !== void 0 ? _d : null,
+                    horaCheckOut: (_e = bloqueio.horaCheckOut) !== null && _e !== void 0 ? _e : null,
                     notaInterna: bloqueio.notaInterna || 'Sem nota interna',
-                    imovelId: (_e = bloqueio.imovelId) !== null && _e !== void 0 ? _e : null,
+                    imovelId: (_f = bloqueio.imovelId) !== null && _f !== void 0 ? _f : null,
                     imovelIdJestor: imovelIdJestor !== null && imovelIdJestor !== void 0 ? imovelIdJestor : null,
+                    status: bloqueio.status,
+                    jestorId: jestorIdAtualizado,
                     sincronizadoNoJestor: false,
                 },
                 create: {
@@ -660,11 +674,13 @@ function salvarBloqueio(bloqueio) {
                     localizador: bloqueio.name,
                     checkIn: bloqueio.checkIn,
                     checkOut: bloqueio.checkOut,
-                    horaCheckIn: (_f = bloqueio.horaCheckIn) !== null && _f !== void 0 ? _f : null,
-                    horaCheckOut: (_g = bloqueio.horaCheckOut) !== null && _g !== void 0 ? _g : null,
+                    horaCheckIn: (_g = bloqueio.horaCheckIn) !== null && _g !== void 0 ? _g : null,
+                    horaCheckOut: (_h = bloqueio.horaCheckOut) !== null && _h !== void 0 ? _h : null,
                     notaInterna: bloqueio.notaInterna || 'Sem nota interna',
-                    imovelId: (_h = bloqueio.imovelId) !== null && _h !== void 0 ? _h : null,
+                    imovelId: (_j = bloqueio.imovelId) !== null && _j !== void 0 ? _j : null,
                     imovelIdJestor: imovelIdJestor !== null && imovelIdJestor !== void 0 ? imovelIdJestor : null,
+                    status: bloqueio.status,
+                    jestorId: jestorIdAtualizado,
                     sincronizadoNoJestor: false,
                 },
             });
@@ -672,10 +688,15 @@ function salvarBloqueio(bloqueio) {
                 // 🚀 Tenta sincronizar o bloqueio com o Jestor
                 yield (0, bloqueios_service_1.sincronizarBloqueio)(bloqueioSalvo, imovelIdJestor !== null && imovelIdJestor !== void 0 ? imovelIdJestor : undefined); // 👈 envia imovelIdJestor
                 // ✅ Atualiza o campo `sincronizadoNoJestor` se a sincronização for bem-sucedida
-                yield database_1.default.bloqueio.update({
-                    where: { id: bloqueioSalvo.id },
-                    data: { sincronizadoNoJestor: true },
-                });
+                if (jestorIdAtualizado) {
+                    yield database_1.default.bloqueio.update({
+                        where: { id: bloqueioSalvo.id },
+                        data: {
+                            jestorId: jestorIdAtualizado,
+                            sincronizadoNoJestor: true,
+                        },
+                    });
+                }
             }
             catch (error) {
                 const errorMessage = error.message || 'Erro desconhecido';
@@ -761,6 +782,51 @@ function salvarCanal(canal) {
             yield (0, erro_service_1.registrarErroJestor)('canal', canalSalvo.id.toString(), errorMessage);
         }
         return { id: canalSalvo.id, jestorId: jestorIdAtualizado };
+    });
+}
+function obterOuCriarCanalReservaDireta() {
+    return __awaiter(this, void 0, void 0, function* () {
+        var _a;
+        const idExternoReservaDireta = 'reserva_direta';
+        let canalExistente = yield database_1.default.canal.findUnique({
+            where: { idExterno: idExternoReservaDireta },
+        });
+        if (canalExistente) {
+            return {
+                id: canalExistente.id,
+                jestorId: (_a = canalExistente.jestorId) !== null && _a !== void 0 ? _a : null,
+            };
+        }
+        const canalSalvo = yield database_1.default.canal.create({
+            data: {
+                idExterno: idExternoReservaDireta,
+                titulo: 'Reserva Direta',
+                sincronizadoNoJestor: false,
+            },
+        });
+        try {
+            const jestorId = yield (0, canais_service_1.sincronizarCanal)(canalSalvo);
+            yield database_1.default.canal.update({
+                where: { id: canalSalvo.id },
+                data: {
+                    jestorId,
+                    sincronizadoNoJestor: true,
+                },
+            });
+            return {
+                id: canalSalvo.id,
+                jestorId,
+            };
+        }
+        catch (error) {
+            const errorMessage = error.message || 'Erro desconhecido';
+            (0, logger_1.logDebug)('Erro', `❌ Erro ao sincronizar canal Reserva Direta: ${errorMessage}`);
+            yield (0, erro_service_1.registrarErroJestor)('canal', canalSalvo.id.toString(), errorMessage);
+            return {
+                id: canalSalvo.id,
+                jestorId: null,
+            };
+        }
     });
 }
 /**

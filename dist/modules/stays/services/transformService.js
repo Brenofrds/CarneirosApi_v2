@@ -1,10 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.formatarDataISOParaBR = formatarDataISOParaBR;
 exports.transformReserva = transformReserva;
 exports.transformAgente = transformAgente;
 exports.transformCanal = transformCanal;
 exports.transformTaxasReserva = transformTaxasReserva;
 exports.transformBloqueio = transformBloqueio;
+function formatarDataISOParaBR(data) {
+    if (!data || data.length < 10)
+        return ''; // Validação básica
+    const [ano, mes, dia] = data.substring(0, 10).split('-');
+    return `${dia}/${mes}/${ano}`;
+}
 function transformReserva(reserva) {
     var _a, _b, _c;
     const diarias = (new Date(reserva.checkOutDate).getTime() - new Date(reserva.checkInDate).getTime()) / (1000 * 60 * 60 * 24);
@@ -25,9 +32,9 @@ function transformReserva(reserva) {
         localizador: reserva.id,
         idExterno: reserva._id,
         dataDaCriacao: reserva.creationDate.split('T')[0],
-        checkIn: reserva.checkInDate.split('T')[0],
+        checkIn: formatarDataISOParaBR(reserva.checkInDate.split('T')[0]),
         horaCheckIn: reserva.checkInTime,
-        checkOut: reserva.checkOutDate.split('T')[0],
+        checkOut: formatarDataISOParaBR(reserva.checkOutDate.split('T')[0]),
         horaCheckOut: reserva.checkOutTime,
         quantidadeHospedes: reserva.guests,
         quantidadeAdultos: reserva.guestsDetails.adults,
@@ -74,15 +81,24 @@ function transformTaxasReserva(reserva, reservaId) {
 }
 function transformBloqueio(bloqueio) {
     var _a, _b, _c;
+    // 🧠 Define o status do bloqueio com base no tipo
+    let statusBloqueio = "Outro";
+    if (bloqueio.type === "blocked") {
+        statusBloqueio = "Bloqueado";
+    }
+    else if (bloqueio.type === "maintenance") {
+        statusBloqueio = "Manutenção";
+    }
     return {
         _id: bloqueio._id, // ID externo único do bloqueio na Stays
         name: bloqueio.id, // Nome ou identificador do bloqueio
         checkIn: bloqueio.checkInDate.split('T')[0], // Data de check-in no formato YYYY-MM-DD
         horaCheckIn: (_a = bloqueio.checkInTime) !== null && _a !== void 0 ? _a : null, // Hora de check-in (se disponível)
-        checkOut: bloqueio.checkOutDate.split('T')[0], // Data de check-out no formato YYYY-MM-DD
+        checkOut: bloqueio.checkOutDate.split('T')[0], // Data de check-out
         horaCheckOut: (_b = bloqueio.checkOutTime) !== null && _b !== void 0 ? _b : null, // Hora de check-out (se disponível)
         notaInterna: (_c = bloqueio.internalNote) !== null && _c !== void 0 ? _c : "Sem nota interna", // Nota associada ao bloqueio
-        idImovelStays: bloqueio._idlisting, // ID externo do imóvel na Stays associado ao bloqueio
-        imovelId: null, // Será preenchido posteriormente ao buscar no banco
+        idImovelStays: bloqueio._idlisting, // ID externo do imóvel associado
+        imovelId: null, // Preenchido depois
+        status: statusBloqueio // ✅ Status categorizado
     };
 }

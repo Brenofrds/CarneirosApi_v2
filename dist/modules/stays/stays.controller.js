@@ -21,7 +21,7 @@ let isProcessing = false; // Flag para controlar se o processamento está em and
  * 🚀 Manipulador do Webhook - Adiciona as requisições na fila para processamento serializado
  */
 const staysWebhookHandler = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g;
     try {
         const action = (_a = req.body) === null || _a === void 0 ? void 0 : _a.action; // Ação recebida no payload do webhook (e.g., reservation.modified)
         const payloadId = ((_c = (_b = req.body) === null || _b === void 0 ? void 0 : _b.payload) === null || _c === void 0 ? void 0 : _c._id) || "undefined"; // ID único do payload (ou "undefined" se ausente)
@@ -58,7 +58,7 @@ const staysWebhookHandler = (req, res) => __awaiter(void 0, void 0, void 0, func
         const payloadId = ((_f = (_e = req.body) === null || _e === void 0 ? void 0 : _e.payload) === null || _f === void 0 ? void 0 : _f._id) || "undefined";
         const errorMessage = error.message || "Erro desconhecido";
         // 🔥 Agora registramos o erro no banco de dados
-        yield (0, erro_service_1.registrarErroStays)(action, payloadId, errorMessage);
+        yield (0, erro_service_1.registrarErroStays)(action, payloadId, errorMessage, (_g = req.body) === null || _g === void 0 ? void 0 : _g.payload);
         (0, logger_1.logDebug)('Erro', `❌ Erro ao processar webhook: ${errorMessage}`);
     }
 });
@@ -103,7 +103,7 @@ function processWebhook(req, res, timestamp) {
             const payloadId = ((_c = (_b = req.body) === null || _b === void 0 ? void 0 : _b.payload) === null || _c === void 0 ? void 0 : _c._id) || "undefined";
             const errorMessage = error.message || "Erro desconhecido";
             // 🔥 Agora registramos o erro no banco de dados
-            yield (0, erro_service_1.registrarErroStays)(action, payloadId, errorMessage);
+            yield (0, erro_service_1.registrarErroStays)(action, payloadId, error.message, req.body.payload);
             (0, logger_1.logDebug)('Erro', `❌ [${timestamp}] Erro ao processar webhook: ${errorMessage}`);
             console.log("-----------------------------------------------------------------------------------------------------------");
         }

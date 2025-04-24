@@ -118,7 +118,7 @@ function fetchReservaDetalhada(reservationId) {
 // Função para buscar os detalhes do imóvel e do proprietário usando o listingId
 function fetchImovelDetalhado(listingId) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
+        var _a, _b, _c;
         try {
             const endpoint = `/content/listings/${listingId}`;
             const response = yield staysClient_1.default.get(endpoint);
@@ -137,12 +137,13 @@ function fetchImovelDetalhado(listingId) {
                 internalName: data.internalName, // Nome interno ou SKU do imóvel
                 status: STATUS_MAP[data.status] || "Oculto", // Traduz o status ou usa "Oculto" por padrão
                 _idproperty: data._idproperty, // ID externo do condomínio relacionado
+                regiao: ((_a = data.address) === null || _a === void 0 ? void 0 : _a.region) || "Região não especificada",
             };
             // 🔹 Extrair dados do proprietário (se existirem na resposta)
             const proprietarioDetalhado = data.owner
                 ? {
                     nome: data.owner.name,
-                    telefone: ((_b = (_a = data.owner.phones) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.iso) || null, // Pega o primeiro telefone se existir
+                    telefone: ((_c = (_b = data.owner.phones) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.iso) || null, // Pega o primeiro telefone se existir
                 }
                 : null;
             return { imovel: imovelDetalhado, proprietario: proprietarioDetalhado };
@@ -160,7 +161,7 @@ function fetchImovelDetalhado(listingId) {
  */
 function fetchCondominioDetalhado(condominioId) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
+        var _a, _b, _c;
         try {
             const endpoint = `/content/properties/${condominioId}`;
             const response = yield staysClient_1.default.get(endpoint);
@@ -177,12 +178,13 @@ function fetchCondominioDetalhado(condominioId) {
                 id: data.id, // ID interno na Stays
                 internalName: data.internalName, // Nome interno ou SKU do condomínio
                 regiao: ((_a = data.address) === null || _a === void 0 ? void 0 : _a.region) || "Região não especificada", // Região do condomínio
-                status: statusMap[data.status] || "Oculto" // Traduz o status ou usa "Oculto" por padrão
+                status: statusMap[data.status] || "Oculto", // Traduz o status ou usa "Oculto" por padrão
+                titulo: ((_b = data._mstitle) === null || _b === void 0 ? void 0 : _b.pt_BR) || "Título não especificado"
             };
             return condominioDetalhado;
         }
         catch (error) {
-            console.error(`Erro ao buscar detalhes do condomínio ${condominioId}:`, ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message);
+            console.error(`Erro ao buscar detalhes do condomínio ${condominioId}:`, ((_c = error.response) === null || _c === void 0 ? void 0 : _c.data) || error.message);
             return null;
         }
     });

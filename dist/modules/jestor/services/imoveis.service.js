@@ -17,7 +17,6 @@ exports.inserirImovelNoJestor = inserirImovelNoJestor;
 exports.atualizarImovelNoJestor = atualizarImovelNoJestor;
 exports.sincronizarImovel = sincronizarImovel;
 const jestorClient_1 = __importDefault(require("../../../config/jestorClient"));
-const erro_service_1 = require("../../database/erro.service");
 const logger_1 = require("../../../utils/logger");
 const database_1 = __importDefault(require("../../../config/database"));
 const ENDPOINT_LIST = '/object/list';
@@ -71,6 +70,7 @@ function inserirImovelNoJestor(imovel, condominioIdJestor, proprietarioIdJestor)
                 sku: imovel.sku,
                 status_2: imovel.status,
                 idcondominiostays: imovel.idCondominioStays || null,
+                regiao: imovel.regiao || null,
                 proprietario_id: imovel.proprietarioId || null, // ✅ Agora enviamos também o ID do proprietário
                 condominio: condominioIdJestor || null,
                 proprietario: proprietarioIdJestor || null,
@@ -85,8 +85,6 @@ function inserirImovelNoJestor(imovel, condominioIdJestor, proprietarioIdJestor)
         catch (error) {
             const errorMessage = ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message || 'Erro desconhecido';
             (0, logger_1.logDebug)('Erro', `❌ Erro ao inserir imóvel ${imovel.idExterno} no Jestor: ${errorMessage}`);
-            // 🔥 Registra o erro na tabela de sincronização
-            yield (0, erro_service_1.registrarErroJestor)('imovel', imovel.idExterno, errorMessage);
             throw new Error(`Erro ao inserir imóvel ${imovel.idExterno} no Jestor`);
         }
     });
@@ -109,6 +107,7 @@ function atualizarImovelNoJestor(imovel, idInterno, condominioIdJestor, propriet
                     sku: imovel.sku,
                     status_2: imovel.status,
                     idcondominiostays: imovel.idCondominioStays || null,
+                    regiao: imovel.regiao || null,
                     proprietario_id: imovel.proprietarioId || null,
                     condominio: condominioIdJestor || null,
                     proprietario: proprietarioIdJestor || null,
@@ -128,8 +127,6 @@ function atualizarImovelNoJestor(imovel, idInterno, condominioIdJestor, propriet
         catch (error) {
             const errorMessage = ((_b = error === null || error === void 0 ? void 0 : error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message || 'Erro desconhecido';
             (0, logger_1.logDebug)('Erro', `❌ Erro ao atualizar imóvel ${imovel.idExterno} no Jestor: ${errorMessage}`);
-            // 🔥 Registra erro na tabela ErroSincronizacao
-            yield (0, erro_service_1.registrarErroJestor)("imovel", imovel.idExterno.toString(), errorMessage);
             throw new Error(`Erro ao atualizar imóvel ${imovel.idExterno} no Jestor`);
         }
     });

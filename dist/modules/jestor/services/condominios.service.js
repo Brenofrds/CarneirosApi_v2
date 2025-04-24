@@ -18,7 +18,6 @@ exports.atualizarCondominioNoJestor = atualizarCondominioNoJestor;
 exports.sincronizarCondominio = sincronizarCondominio;
 const jestorClient_1 = __importDefault(require("../../../config/jestorClient"));
 const models_1 = require("../../database/models");
-const erro_service_1 = require("../../database/erro.service");
 const logger_1 = require("../../../utils/logger");
 const database_1 = __importDefault(require("../../../config/database"));
 const ENDPOINT_LIST = '/object/list';
@@ -72,6 +71,7 @@ function inserirCondominioNoJestor(condominio) {
                 skuinternalname: condominio.sku,
                 regiao: condominio.regiao,
                 status_1: condominio.status,
+                titulo: condominio.titulo || '',
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
                 object_type: JESTOR_TB_CONDOMINIO,
@@ -83,8 +83,6 @@ function inserirCondominioNoJestor(condominio) {
         catch (error) {
             const errorMessage = ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message || 'Erro desconhecido';
             (0, logger_1.logDebug)('Erro', `❌ Erro ao inserir condomínio ${condominio.idExterno} no Jestor: ${errorMessage}`);
-            // 🔥 Registra o erro na tabela de sincronização
-            yield (0, erro_service_1.registrarErroJestor)('condominio', condominio.idExterno, errorMessage);
             throw new Error(`Erro ao inserir condomínio ${condominio.idExterno} no Jestor`);
         }
     });
@@ -107,6 +105,7 @@ function atualizarCondominioNoJestor(condominio, idInterno) {
                     skuinternalname: condominio.sku,
                     regiao: condominio.regiao,
                     status_1: condominio.status,
+                    titulo: condominio.titulo || '',
                 }
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_UPDATE, data);
@@ -121,7 +120,6 @@ function atualizarCondominioNoJestor(condominio, idInterno) {
         catch (error) {
             const errorMessage = ((_b = error === null || error === void 0 ? void 0 : error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message || 'Erro desconhecido';
             (0, logger_1.logDebug)('Erro', `❌ Erro ao atualizar condomínio ${condominio.idExterno} no Jestor: ${errorMessage}`);
-            yield (0, erro_service_1.registrarErroJestor)("condominio", condominio.idExterno, errorMessage);
             throw new Error(`Erro ao atualizar condomínio ${condominio.idExterno} no Jestor`);
         }
     });

@@ -17,7 +17,6 @@ exports.inserirBloqueioNoJestor = inserirBloqueioNoJestor;
 exports.atualizarBloqueioNoJestor = atualizarBloqueioNoJestor;
 exports.sincronizarBloqueio = sincronizarBloqueio;
 const jestorClient_1 = __importDefault(require("../../../config/jestorClient"));
-const erro_service_1 = require("../../database/erro.service");
 const database_1 = __importDefault(require("../../../config/database"));
 const logger_1 = require("../../../utils/logger");
 const ENDPOINT_LIST = '/object/list';
@@ -70,6 +69,7 @@ function inserirBloqueioNoJestor(bloqueio, imovelIdJestor) {
                 imovelid: bloqueio.imovelId,
                 imovel: bloqueio.imovelId,
                 imovel_1: imovelIdJestor,
+                status: bloqueio.status,
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
                 object_type: JESTOR_TB_BLOQUEIO,
@@ -81,7 +81,6 @@ function inserirBloqueioNoJestor(bloqueio, imovelIdJestor) {
         catch (error) {
             const errorMessage = ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message || 'Erro desconhecido';
             (0, logger_1.logDebug)('Erro', `❌ Erro ao inserir bloqueio ${bloqueio.idExterno} no Jestor: ${errorMessage}`);
-            yield (0, erro_service_1.registrarErroJestor)('bloqueio', bloqueio.idExterno, errorMessage);
             throw new Error(`Erro ao inserir bloqueio ${bloqueio.idExterno} no Jestor`);
         }
     });
@@ -111,6 +110,7 @@ function atualizarBloqueioNoJestor(bloqueio, idInterno, imovelIdJestor) {
                     imovelid: bloqueio.imovelId,
                     imovel: bloqueio.imovelId,
                     imovel_1: imovelIdJestor,
+                    status: bloqueio.status,
                 },
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_UPDATE, data);
@@ -120,7 +120,6 @@ function atualizarBloqueioNoJestor(bloqueio, idInterno, imovelIdJestor) {
         catch (error) {
             const errorMessage = ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message || 'Erro desconhecido';
             (0, logger_1.logDebug)('Erro', `❌ Erro ao atualizar bloqueio ${bloqueio.idExterno} no Jestor: ${errorMessage}`);
-            yield (0, erro_service_1.registrarErroJestor)('bloqueio', bloqueio.idExterno, errorMessage);
             throw new Error(`Erro ao atualizar bloqueio ${bloqueio.idExterno} no Jestor`);
         }
     });
@@ -130,14 +129,30 @@ function atualizarBloqueioNoJestor(bloqueio, idInterno, imovelIdJestor) {
  */
 function sincronizarBloqueio(bloqueio, imovelIdJestor) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a;
         try {
-            const idInterno = yield obterIdInternoBloqueioNoJestor(bloqueio.idExterno);
+            let idInterno = bloqueio.jestorId || null;
+            // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
             if (!idInterno) {
-                yield inserirBloqueioNoJestor(bloqueio, imovelIdJestor);
+                idInterno = yield obterIdInternoBloqueioNoJestor(bloqueio.idExterno);
+            }
+            // 🚀 Decide entre inserir ou atualizar
+            if (!idInterno) {
+                const response = yield inserirBloqueioNoJestor(bloqueio, imovelIdJestor);
+                idInterno = (_a = response === null || response === void 0 ? void 0 : response.data) === null || _a === void 0 ? void 0 : _a[`id_${JESTOR_TB_BLOQUEIO}`];
             }
             else {
-                yield atualizarBloqueioNoJestor(bloqueio, idInterno, imovelIdJestor);
+                yield atualizarBloqueioNoJestor(bloqueio, idInterno.toString(), imovelIdJestor);
             }
+            // 🟢 Atualiza sincronização no banco
+            yield database_1.default.bloqueio.update({
+                where: { idExterno: bloqueio.idExterno },
+                data: {
+                    sincronizadoNoJestor: true,
+                    jestorId: idInterno,
+                },
+            });
+            return idInterno;
         }
         catch (error) {
             const errorMessage = error.message || 'Erro desconhecido';

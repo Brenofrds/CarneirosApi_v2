@@ -18,7 +18,6 @@ exports.atualizarProprietarioNoJestor = atualizarProprietarioNoJestor;
 exports.sincronizarProprietario = sincronizarProprietario;
 const jestorClient_1 = __importDefault(require("../../../config/jestorClient"));
 const models_1 = require("../../database/models");
-const erro_service_1 = require("../../database/erro.service");
 const database_1 = __importDefault(require("../../../config/database"));
 const logger_1 = require("../../../utils/logger");
 const ENDPOINT_LIST = '/object/list';
@@ -80,7 +79,6 @@ function inserirProprietarioNoJestor(proprietario) {
         catch (error) {
             const errorMessage = ((_a = error === null || error === void 0 ? void 0 : error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message || 'Erro desconhecido';
             (0, logger_1.logDebug)('Erro', `❌ Erro ao inserir proprietário ${proprietario.nome} no Jestor: ${errorMessage}`);
-            yield (0, erro_service_1.registrarErroJestor)('proprietario', proprietario.id.toString(), errorMessage);
             throw new Error(`Erro ao inserir proprietário ${proprietario.nome} no Jestor`);
         }
     });
@@ -114,7 +112,6 @@ function atualizarProprietarioNoJestor(proprietario, idInterno) {
         catch (error) {
             const errorMessage = ((_b = error === null || error === void 0 ? void 0 : error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message || 'Erro desconhecido';
             (0, logger_1.logDebug)('Erro', `❌ Erro ao atualizar proprietário ${proprietario.nome} no Jestor: ${errorMessage}`);
-            yield (0, erro_service_1.registrarErroJestor)("proprietario", proprietario.id.toString(), errorMessage);
             throw new Error(`Erro ao atualizar proprietário ${proprietario.nome} no Jestor`);
         }
     });
