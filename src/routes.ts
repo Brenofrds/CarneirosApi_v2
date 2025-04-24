@@ -1,5 +1,5 @@
 import express from "express";
-import { staysWebhookHandler } from "../src/modules/stays/stays.controller";
+import { staysWebhookHandler } from "./modules/stays/stays.controller";
 
 const router = express.Router();
 
