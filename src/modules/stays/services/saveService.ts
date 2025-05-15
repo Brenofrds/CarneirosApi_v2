@@ -952,7 +952,7 @@ export async function salvarAgente(agente: AgenteDetalhado): Promise<{ id: numbe
         logDebug('Agente', `🔄 Sincronizando agente ${agente._id} no Jestor.`);
 
         // ✅ Garantimos que agenteExistente não é null dentro deste bloco
-        const jestorIdAtualizado = await sincronizarAgente(agenteExistente);
+        jestorIdAtualizado = await sincronizarAgente(agenteExistente);
 
         // Atualiza o jestorId e marca como sincronizado
         await prisma.agente.update({

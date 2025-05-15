@@ -854,7 +854,7 @@ function salvarAgente(agente) {
                 try {
                     (0, logger_1.logDebug)('Agente', `🔄 Sincronizando agente ${agente._id} no Jestor.`);
                     // ✅ Garantimos que agenteExistente não é null dentro deste bloco
-                    const jestorIdAtualizado = yield (0, agentes_service_1.sincronizarAgente)(agenteExistente);
+                    jestorIdAtualizado = yield (0, agentes_service_1.sincronizarAgente)(agenteExistente);
                     // Atualiza o jestorId e marca como sincronizado
                     yield database_1.default.agente.update({
                         where: { id: agenteExistente.id },
