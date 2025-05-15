@@ -22,8 +22,7 @@ export async function obterIdInternoProprietarioNoJestor(nome: string, telefone:
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_PROPRIETARIO,
             filters: [
-                { field: 'proprietario_principal', value: nome, operator: '==' },
-                { field: 'telefone', value: telefone, operator: '==' },
+                { field: 'proprietario_principal', value: nome, operator: '==' }
             ],
         });
 
