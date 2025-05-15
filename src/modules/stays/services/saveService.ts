@@ -992,7 +992,7 @@ export async function salvarAgente(agente: AgenteDetalhado): Promise<{ id: numbe
   try {
     logDebug('Agente', `🔄 Sincronizando agente ${agente._id} com o Jestor.`);
 
-    const jestorIdAtualizado = await sincronizarAgente(agenteSalvo);
+    jestorIdAtualizado = await sincronizarAgente(agenteSalvo);
 
     // Após sincronização, atualiza jestorId e marca como sincronizado
     if (jestorIdAtualizado) {
