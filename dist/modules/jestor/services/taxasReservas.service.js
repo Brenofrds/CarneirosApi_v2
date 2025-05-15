@@ -27,19 +27,19 @@ const JESTOR_TB_TAXARESERVA = 'nilxosn73_05mr38wy28l';
 /**
  * Consulta o Jestor para verificar se a taxa de reserva existe e, se sim, retorna o ID interno.
  *
- * @param id - O ID da taxa de reserva.
  * @param nome - O nome da taxa de reserva.
+ * @param reservaIdJestor - ID interno da reserva no Jestor.
  * @returns - O ID interno do Jestor ou null se a taxa de reserva não existir.
  */
-function obterIdInternoTaxaReservaNoJestor(id, nome) {
+function obterIdInternoTaxaReservaNoJestor(nome, reservaIdJestor) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b;
         try {
             const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_TAXARESERVA,
                 filters: [
-                    { field: 'id_bd_engnet', value: id, operator: '==' },
                     { field: 'name', value: nome, operator: '==' },
+                    { field: 'reserva', value: reservaIdJestor, operator: '==' },
                 ],
             });
             const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
@@ -126,7 +126,10 @@ function atualizarTaxaReservaNoJestor(taxaReserva, idInterno, reservaIdJestor) {
 function sincronizarTaxaReserva(taxaReserva, reservaIdJestor) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const idInterno = yield obterIdInternoTaxaReservaNoJestor(taxaReserva.id, taxaReserva.name);
+            if (!reservaIdJestor) {
+                throw new Error('reservaIdJestor não pode ser undefined');
+            }
+            const idInterno = yield obterIdInternoTaxaReservaNoJestor(taxaReserva.name, reservaIdJestor);
             if (!idInterno) {
                 yield inserirTaxaReservaNoJestor(taxaReserva, reservaIdJestor);
             }

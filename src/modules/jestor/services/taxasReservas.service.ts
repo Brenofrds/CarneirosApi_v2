@@ -13,35 +13,36 @@ const JESTOR_TB_TAXARESERVA = 'nilxosn73_05mr38wy28l';
 /**
  * Consulta o Jestor para verificar se a taxa de reserva existe e, se sim, retorna o ID interno.
  * 
- * @param id - O ID da taxa de reserva.
  * @param nome - O nome da taxa de reserva.
+ * @param reservaIdJestor - ID interno da reserva no Jestor.
  * @returns - O ID interno do Jestor ou null se a taxa de reserva não existir.
  */
-export async function obterIdInternoTaxaReservaNoJestor(id: string | number, nome: string | null) {
-    try {
-        const response = await jestorClient.post(ENDPOINT_LIST, {
-            object_type: JESTOR_TB_TAXARESERVA,
-            filters: [
-                { field: 'id_bd_engnet', value: id, operator: '==' },
-                { field: 'name', value: nome, operator: '==' },
-            ],
-        });
+export async function obterIdInternoTaxaReservaNoJestor(nome: string, reservaIdJestor: number) {
+  try {
+    const response = await jestorClient.post(ENDPOINT_LIST, {
+      object_type: JESTOR_TB_TAXARESERVA,
+      filters: [
+        { field: 'name', value: nome, operator: '==' },
+        { field: 'reserva', value: reservaIdJestor, operator: '==' },
+      ],
+    });
 
-        const items = response.data?.data?.items;
+    const items = response.data?.data?.items;
 
-        if (Array.isArray(items) && items.length > 0) {
-            const idInterno = items[0][`id_${JESTOR_TB_TAXARESERVA}`];
-            return idInterno ?? null;
-        }
-
-        return null;
-
-    } catch (error: any) {
-        const errorMessage = error.message || 'Erro desconhecido';
-        logDebug('Erro', `❌ Erro ao buscar taxa de reserva no Jestor: ${errorMessage}`);
-        throw new Error('Erro ao buscar taxa de reserva no Jestor');
+    if (Array.isArray(items) && items.length > 0) {
+      const idInterno = items[0][`id_${JESTOR_TB_TAXARESERVA}`];
+      return idInterno ?? null;
     }
+
+    return null;
+
+  } catch (error: any) {
+    const errorMessage = error.message || 'Erro desconhecido';
+    logDebug('Erro', `❌ Erro ao buscar taxa de reserva no Jestor: ${errorMessage}`);
+    throw new Error('Erro ao buscar taxa de reserva no Jestor');
+  }
 }
+
 
 /**
  * Insere uma taxa de reserva no Jestor.
@@ -118,7 +119,10 @@ export async function atualizarTaxaReservaNoJestor(taxaReserva: typeTaxaReserva,
  */
 export async function sincronizarTaxaReserva(taxaReserva: typeTaxaReserva, reservaIdJestor?: number) {
     try {
-        const idInterno = await obterIdInternoTaxaReservaNoJestor(taxaReserva.id, taxaReserva.name);
+        if (!reservaIdJestor) {
+            throw new Error('reservaIdJestor não pode ser undefined');
+            }
+        const idInterno = await obterIdInternoTaxaReservaNoJestor(taxaReserva.name, reservaIdJestor);
 
         if (!idInterno) {
             await inserirTaxaReservaNoJestor(taxaReserva, reservaIdJestor);
