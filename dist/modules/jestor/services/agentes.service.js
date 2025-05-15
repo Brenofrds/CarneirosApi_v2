@@ -120,6 +120,8 @@ function sincronizarAgente(agente) {
             // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
             if (!idInterno) {
                 idInterno = yield obterIdInternoAgenteNoJestor(agente.idExterno);
+                // coloque o print aqui
+                (0, logger_1.logDebug)('Agente', `🔍 ID interno encontrado no Jestor para agente ${agente.idExterno}: ${idInterno}`);
             }
             // 🚀 Decide entre inserir ou atualizar
             if (!idInterno) {

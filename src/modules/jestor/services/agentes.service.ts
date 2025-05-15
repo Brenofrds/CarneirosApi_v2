@@ -110,6 +110,8 @@ export async function sincronizarAgente(agente: typeAgente): Promise<number | nu
       // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
       if (!idInterno) {
         idInterno = await obterIdInternoAgenteNoJestor(agente.idExterno);
+        // coloque o print aqui
+        logDebug('Agente', `🔍 ID interno encontrado no Jestor para agente ${agente.idExterno}: ${idInterno}`);
       }
   
       // 🚀 Decide entre inserir ou atualizar
