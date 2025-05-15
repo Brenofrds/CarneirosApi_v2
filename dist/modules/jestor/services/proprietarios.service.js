@@ -38,8 +38,7 @@ function obterIdInternoProprietarioNoJestor(nome, telefone) {
             const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_PROPRIETARIO,
                 filters: [
-                    { field: 'proprietario_principal', value: nome, operator: '==' },
-                    { field: 'telefone', value: telefone, operator: '==' },
+                    { field: 'proprietario_principal', value: nome, operator: '==' }
                 ],
             });
             const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
