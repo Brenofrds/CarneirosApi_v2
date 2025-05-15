@@ -98,7 +98,8 @@ function atualizarTaxaReservaNoJestor(taxaReserva, idInterno, reservaIdJestor) {
                 object_type: JESTOR_TB_TAXARESERVA,
                 data: {
                     [`id_${JESTOR_TB_TAXARESERVA}`]: idInterno,
-                    reservaid: taxaReserva.reservaId,
+                    id_bd_engnet: taxaReserva.id,
+                    reserva_id: taxaReserva.reservaId,
                     nometaxa: taxaReserva.name,
                     valor: taxaReserva.valor,
                     testengnet_reservas: reservaIdJestor,
