@@ -86,6 +86,7 @@ export async function atualizarCondominioNoJestor(condominio: typeCondominio, id
         object_type: JESTOR_TB_CONDOMINIO,
         data: {
           [`id_${JESTOR_TB_CONDOMINIO}`]: idInterno,
+          id_bd_engnet: condominio.id,
           id: condominio.idExterno,
           codigo: condominio.idStays,
           name: condominio.sku,
