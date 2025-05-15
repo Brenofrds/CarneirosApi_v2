@@ -22,7 +22,7 @@ const database_1 = __importDefault(require("../../../config/database"));
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_IMOVEL = 'oplicg48civ1tjt96g6e7';
+const JESTOR_TB_IMOVEL = 'e8c63980a87a858620f77';
 /**
  * Consulta o Jestor para verificar se o imóvel existe e, se sim, retorna o ID interno.
  *
@@ -37,8 +37,8 @@ function obterIdInternoImovelNoJestor(idExterno, sku) {
             const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_IMOVEL,
                 filters: [
-                    { field: 'idexterno', value: idExterno, operator: '==' },
-                    { field: 'sku', value: sku, operator: '==' },
+                    { field: 'id_externo', value: idExterno, operator: '==' },
+                    { field: 'name', value: sku, operator: '==' },
                 ],
             });
             const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
@@ -64,13 +64,13 @@ function inserirImovelNoJestor(imovel, condominioIdJestor, proprietarioIdJestor)
         var _a;
         try {
             const data = {
-                idbdengnet: imovel.id,
-                idexterno: imovel.idExterno,
-                idstays: imovel.idStays,
-                sku: imovel.sku,
-                status_2: imovel.status,
+                id_bd_engnet: imovel.id,
+                id_externo: imovel.idExterno,
+                id_stays: imovel.idStays,
+                name: imovel.sku,
+                status: imovel.status,
                 idcondominiostays: imovel.idCondominioStays || null,
-                regiao: imovel.regiao || null,
+                regiao_1: imovel.regiao || null,
                 proprietario_id: imovel.proprietarioId || null, // ✅ Agora enviamos também o ID do proprietário
                 condominio: condominioIdJestor || null,
                 proprietario: proprietarioIdJestor || null,
@@ -102,12 +102,13 @@ function atualizarImovelNoJestor(imovel, idInterno, condominioIdJestor, propriet
                 object_type: JESTOR_TB_IMOVEL,
                 data: {
                     [`id_${JESTOR_TB_IMOVEL}`]: idInterno, // ✅ Campo obrigatório do ID interno
-                    idexterno: imovel.idExterno,
-                    idstays: imovel.idStays,
-                    sku: imovel.sku,
-                    status_2: imovel.status,
+                    id_bd_engnet: imovel.id,
+                    id_externo: imovel.idExterno,
+                    id_stays: imovel.idStays,
+                    name: imovel.sku,
+                    status: imovel.status,
                     idcondominiostays: imovel.idCondominioStays || null,
-                    regiao: imovel.regiao || null,
+                    regiao_1: imovel.regiao || null,
                     proprietario_id: imovel.proprietarioId || null,
                     condominio: condominioIdJestor || null,
                     proprietario: proprietarioIdJestor || null,

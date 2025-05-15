@@ -23,7 +23,7 @@ const database_1 = __importDefault(require("../../../config/database"));
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_CONDOMINIO = 'w_zk_k73oj_eld8yvjn0u';
+const JESTOR_TB_CONDOMINIO = 'b30305a4f8ff36f37403e';
 /**
  * Consulta o Jestor para verificar se o condomínio existe e, se sim, retorna o ID interno.
  *
@@ -38,8 +38,8 @@ function obterIdInternoCondominioNoJestor(idExterno, sku) {
             const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_CONDOMINIO,
                 filters: [
-                    { field: 'idexterno', value: idExterno, operator: '==' },
-                    { field: 'skuinternalname', value: sku, operator: '==' },
+                    { field: 'id', value: idExterno, operator: '==' },
+                    { field: 'name', value: sku, operator: '==' },
                 ],
             });
             const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
@@ -65,12 +65,12 @@ function inserirCondominioNoJestor(condominio) {
         var _a;
         try {
             const data = {
-                idbdengnet: condominio.id,
-                idexterno: condominio.idExterno,
-                idstays: condominio.idStays,
-                skuinternalname: condominio.sku,
+                id_bd_engnet: condominio.id,
+                id: condominio.idExterno,
+                codigo: condominio.idStays,
+                name: condominio.sku,
                 regiao: condominio.regiao,
-                status_1: condominio.status,
+                status: condominio.status,
                 titulo: condominio.titulo || '',
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
@@ -100,11 +100,11 @@ function atualizarCondominioNoJestor(condominio, idInterno) {
                 object_type: JESTOR_TB_CONDOMINIO,
                 data: {
                     [`id_${JESTOR_TB_CONDOMINIO}`]: idInterno,
-                    idexterno: condominio.idExterno,
-                    idstays: condominio.idStays,
-                    skuinternalname: condominio.sku,
+                    id: condominio.idExterno,
+                    codigo: condominio.idStays,
+                    name: condominio.sku,
                     regiao: condominio.regiao,
-                    status_1: condominio.status,
+                    status: condominio.status,
                     titulo: condominio.titulo || '',
                 }
             };

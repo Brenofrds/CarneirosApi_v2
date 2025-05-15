@@ -23,35 +23,42 @@ const database_1 = __importDefault(require("../../../config/database"));
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_HOSPEDE = 'b_d6pu1giq_jb0gd7f0ed';
+const JESTOR_TB_HOSPEDE = '9ojuwm9mwun5ik__gkp21';
 /**
  * Consulta o Jestor para verificar se o hóspede existe e, se sim, retorna o ID interno.
+ * Tenta primeiro buscar por idExterno; se não encontrar, busca pelo nome.
  *
  * @param nome - Nome completo do hóspede.
  * @param idExterno - O ID externo do hóspede.
- * @param reservaId - O ID da reserva associada.
  * @returns - O ID interno do Jestor ou null se o hóspede não existir.
  */
-function obterIdInternoHospedeNoJestor(nome, idExterno, reservaId) {
+function obterIdInternoHospedeNoJestor(nome, idExterno) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
+        var _a, _b, _c, _d;
         try {
-            const filters = [
-                { field: 'nomecompleto', value: nome, operator: '==' },
-                { field: 'id_reserva', value: reservaId, operator: '==' }
-            ];
+            // 1. Buscar pelo idExterno, se fornecido
             if (idExterno) {
-                filters.push({ field: 'idexterno', value: idExterno, operator: '==' });
+                const responseId = yield jestorClient_1.default.post(ENDPOINT_LIST, {
+                    object_type: JESTOR_TB_HOSPEDE,
+                    filters: [{ field: 'idexterno', value: idExterno, operator: '==' }],
+                });
+                const itemsId = (_b = (_a = responseId.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
+                if (Array.isArray(itemsId) && itemsId.length > 0) {
+                    const idInterno = itemsId[0][`id_${JESTOR_TB_HOSPEDE}`];
+                    return idInterno !== null && idInterno !== void 0 ? idInterno : null;
+                }
             }
-            const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
+            // 2. Se não encontrou pelo idExterno, buscar pelo nome
+            const responseNome = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_HOSPEDE,
-                filters,
+                filters: [{ field: 'name', value: nome, operator: '==' }],
             });
-            const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
-            if (Array.isArray(items) && items.length > 0) {
-                const idInterno = items[0][`id_${JESTOR_TB_HOSPEDE}`];
+            const itemsNome = (_d = (_c = responseNome.data) === null || _c === void 0 ? void 0 : _c.data) === null || _d === void 0 ? void 0 : _d.items;
+            if (Array.isArray(itemsNome) && itemsNome.length > 0) {
+                const idInterno = itemsNome[0][`id_${JESTOR_TB_HOSPEDE}`];
                 return idInterno !== null && idInterno !== void 0 ? idInterno : null;
             }
+            // 3. Não encontrou nenhum resultado
             return null;
         }
         catch (error) {
@@ -70,17 +77,17 @@ function inserirHospedeNoJestor(hospede, reservaIdJestor) {
         var _a;
         try {
             const data = {
-                name: hospede.id,
+                id_bd_engnet: hospede.id,
                 idexterno: hospede.idExterno,
-                nomecompleto: hospede.nomeCompleto,
+                name: hospede.nomeCompleto,
                 email: hospede.email,
-                datanascimento: hospede.dataDeNascimento,
+                data_de_nascimento: hospede.dataDeNascimento,
                 idade: hospede.idade,
                 telefone: hospede.telefone,
                 cpf: hospede.cpf,
                 documento: hospede.documento,
-                id_reserva: hospede.reservaId,
-                reserva_1: reservaIdJestor,
+                idreserva: hospede.reservaId,
+                reserva: reservaIdJestor,
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
                 object_type: JESTOR_TB_HOSPEDE,
@@ -108,20 +115,21 @@ function atualizarHospedeNoJestor(hospede, idInterno, reservaIdJestor) {
             const data = {
                 object_type: JESTOR_TB_HOSPEDE,
                 data: {
-                    [`id_${JESTOR_TB_HOSPEDE}`]: idInterno, // Campo obrigatório do ID interno
-                    nomecompleto: hospede.nomeCompleto,
+                    [`id_${JESTOR_TB_HOSPEDE}`]: idInterno,
+                    id_bd_engnet: hospede.id,
+                    idexterno: hospede.idExterno,
+                    name: hospede.nomeCompleto,
                     email: hospede.email,
-                    datanascimento: hospede.dataDeNascimento,
+                    data_de_nascimento: hospede.dataDeNascimento,
+                    idade: hospede.idade,
                     telefone: hospede.telefone,
                     cpf: hospede.cpf,
                     documento: hospede.documento,
-                    id_reserva: hospede.reservaId,
-                    reserva_1: reservaIdJestor,
+                    idreserva: hospede.reservaId,
+                    reserva: reservaIdJestor,
                 }
             };
-            // 🚀 Envia a solicitação de atualização ao Jestor
             const response = yield jestorClient_1.default.post(ENDPOINT_UPDATE, data);
-            // ✅ Log simplificado apenas com o status e o nome do hóspede atualizado
             if ((_a = response.data) === null || _a === void 0 ? void 0 : _a.status) {
                 (0, logger_1.logDebug)('Hóspede', `🔹 Hóspede ${hospede.nomeCompleto} atualizado com sucesso no Jestor!`);
             }
@@ -144,7 +152,7 @@ function sincronizarHospede(hospede, reservaIdJestor) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             // 📥 Tenta obter o ID interno do hóspede no Jestor
-            const idInterno = yield obterIdInternoHospedeNoJestor(hospede.nomeCompleto, hospede.idExterno, hospede.reservaId);
+            const idInterno = yield obterIdInternoHospedeNoJestor(hospede.nomeCompleto, hospede.idExterno);
             if (!idInterno) {
                 yield inserirHospedeNoJestor(hospede, reservaIdJestor);
             }

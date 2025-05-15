@@ -23,7 +23,7 @@ const logger_1 = require("../../../utils/logger");
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_PROPRIETARIO = 'yhe66m7287os9_0xq_kbu';
+const JESTOR_TB_PROPRIETARIO = 'a3672133a5950a31442d1';
 /**
  * Consulta o Jestor para verificar se o proprietário existe e, se sim, retorna o ID interno.
  *
@@ -38,7 +38,7 @@ function obterIdInternoProprietarioNoJestor(nome, telefone) {
             const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_PROPRIETARIO,
                 filters: [
-                    { field: 'nome_1', value: nome, operator: '==' },
+                    { field: 'proprietario_principal', value: nome, operator: '==' },
                     { field: 'telefone', value: telefone, operator: '==' },
                 ],
             });
@@ -65,8 +65,8 @@ function inserirProprietarioNoJestor(proprietario) {
         var _a;
         try {
             const data = {
-                idapi: proprietario.id,
-                nome_1: proprietario.nome,
+                id_bd_engnet: proprietario.id,
+                proprietario_principal: proprietario.nome,
                 telefone: proprietario.telefone,
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
@@ -96,7 +96,7 @@ function atualizarProprietarioNoJestor(proprietario, idInterno) {
                 object_type: JESTOR_TB_PROPRIETARIO,
                 data: {
                     [`id_${JESTOR_TB_PROPRIETARIO}`]: idInterno,
-                    nome_1: proprietario.nome,
+                    proprietario_principal: proprietario.nome,
                     telefone: proprietario.telefone,
                 }
             };

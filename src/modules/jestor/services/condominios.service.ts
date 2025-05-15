@@ -8,7 +8,7 @@ import prisma from '../../../config/database';
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_CONDOMINIO = 'w_zk_k73oj_eld8yvjn0u';
+const JESTOR_TB_CONDOMINIO = 'b30305a4f8ff36f37403e';
 
 /**
  * Consulta o Jestor para verificar se o condomínio existe e, se sim, retorna o ID interno.
@@ -22,8 +22,8 @@ export async function obterIdInternoCondominioNoJestor(idExterno: string, sku: s
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_CONDOMINIO,
             filters: [
-                { field: 'idexterno', value: idExterno, operator: '==' },
-                { field: 'skuinternalname', value: sku, operator: '==' },
+                { field: 'id', value: idExterno, operator: '==' },
+                { field: 'name', value: sku, operator: '==' },
             ],
         });
 
@@ -49,13 +49,14 @@ export async function obterIdInternoCondominioNoJestor(idExterno: string, sku: s
  */
 export async function inserirCondominioNoJestor(condominio: typeCondominio) {
     try {
+
       const data: Record<string, any> = {
-        idbdengnet: condominio.id,
-        idexterno: condominio.idExterno,
-        idstays: condominio.idStays,
-        skuinternalname: condominio.sku,
+        id_bd_engnet: condominio.id,
+        id: condominio.idExterno,
+        codigo: condominio.idStays,
+        name: condominio.sku,
         regiao: condominio.regiao,
-        status_1: condominio.status,
+        status: condominio.status,
         titulo: condominio.titulo || '',
       };
   
@@ -85,11 +86,11 @@ export async function atualizarCondominioNoJestor(condominio: typeCondominio, id
         object_type: JESTOR_TB_CONDOMINIO,
         data: {
           [`id_${JESTOR_TB_CONDOMINIO}`]: idInterno,
-          idexterno: condominio.idExterno,
-          idstays: condominio.idStays,
-          skuinternalname: condominio.sku,
+          id: condominio.idExterno,
+          codigo: condominio.idStays,
+          name: condominio.sku,
           regiao: condominio.regiao,
-          status_1: condominio.status,
+          status: condominio.status,
           titulo: condominio.titulo || '',
         }
       };

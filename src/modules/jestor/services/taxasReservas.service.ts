@@ -8,8 +8,7 @@ import prisma from '../../../config/database';
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_TAXARESERVA = '7l02yg9daf48d5cfmzbsm';
-const JESTOR_TB_RESERVA = 'e4sqtj0lt_yjxd075da5t';
+const JESTOR_TB_TAXARESERVA = 'nilxosn73_05mr38wy28l';
 
 /**
  * Consulta o Jestor para verificar se a taxa de reserva existe e, se sim, retorna o ID interno.
@@ -23,8 +22,8 @@ export async function obterIdInternoTaxaReservaNoJestor(id: string | number, nom
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_TAXARESERVA,
             filters: [
-                { field: 'idbdapi', value: id, operator: '==' },
-                { field: 'nometaxa', value: nome, operator: '==' },
+                { field: 'id_bd_engnet', value: id, operator: '==' },
+                { field: 'name', value: nome, operator: '==' },
             ],
         });
 
@@ -52,11 +51,11 @@ export async function inserirTaxaReservaNoJestor(taxaReserva: typeTaxaReserva, r
     try {
 
         const data: Record<string, any> = {
-            idbdapi: taxaReserva.id,
-            reservaid: taxaReserva.reservaId,
-            nometaxa: taxaReserva.name,
+            id_bd_engnet: taxaReserva.id,
+            reserva_id: taxaReserva.reservaId,
+            name: taxaReserva.name,
             valor: taxaReserva.valor,
-            testengnet_reservas: reservaIdJestor,
+            reserva: reservaIdJestor,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {

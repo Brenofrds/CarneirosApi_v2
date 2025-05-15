@@ -8,7 +8,7 @@ import { logDebug } from '../../../utils/logger';
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_RESERVA = 'e4sqtj0lt_yjxd075da5t';
+const JESTOR_TB_RESERVA = 'b03f6af310a8f26667439';
 
 /**
  * Consulta o Jestor para verificar se a reserva existe e, se sim, retorna o ID interno.
@@ -60,37 +60,29 @@ export async function inserirReservaNoJestor(reserva: typeReserva, agenteIdJesto
             hora_checkin: reserva.horaCheckIn,
             checkout: reserva.checkOut,
             hora_checkout: reserva.horaCheckOut,
-            quant_hospedes: reserva.quantidadeHospedes,
-            quant_adt: reserva.quantidadeAdultos,
-            quant_chd: reserva.quantidadeCriancas,
-            quant_inf: reserva.quantidadeInfantil,
+            quantidade_de_hospedes: reserva.quantidadeHospedes,
+            quantidade_adt: reserva.quantidadeAdultos,
+            quantidade_chd: reserva.quantidadeCriancas,
+            quantidade_inf: reserva.quantidadeInfantil,
             moeda: reserva.moeda,
             valor_total: reserva.valorTotal,
             total_pago: reserva.totalPago,
-            pendente_quitacao: reserva.pendenteQuitacao,
+            pendente_quitacao_1: reserva.pendenteQuitacao,
             total_taxas_extras: reserva.totalTaxasExtras,
-            quant_diarias: reserva.quantidadeDiarias,
+            quantidade_de_diarias: reserva.quantidadeDiarias,
             partnercode: reserva.partnerCode,
-            id_imovel_stays: reserva.idImovelStays,
-            origem: reserva.origem,
-            status1: reserva.status,
-            condominio: reserva.condominio,
-            regiao: reserva.regiao,
+            id_imovel_stays_1: reserva.idImovelStays,
+            origem_canal: reserva.origem,
+            status: reserva.status,
+            condominio_1: reserva.condominio,
+            regiao_1: reserva.regiao,
             imovel_oficial_sku: reserva.imovelOficialSku,
-            observacao: reserva.observacao,
-            link_stays_1: reserva.linkStays,
+            observacoes: reserva.observacao,
+            link_stays_2: reserva.linkStays,
             agente: agenteIdJestor,
-            canal_1: canalIdJestor,
-            imovel: imovelIdJestor,
+            canal: canalIdJestor,
+            apartamento: imovelIdJestor,
         };
-
-        // Adiciona apenas se os IDs estiverem presentes
-        if (reserva.imovelId) data.id_imovel = reserva.imovelId;
-        if (reserva.canalId) data.canal = reserva.canalId;
-        if (agenteIdJestor) data.agente = agenteIdJestor;
-        if (canalIdJestor) data.canal_1 = canalIdJestor;
-        if (imovelIdJestor) data.imovel = imovelIdJestor;
-
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
             object_type: JESTOR_TB_RESERVA,
@@ -133,35 +125,30 @@ export async function atualizarReservaNoJestor(reserva: typeReserva, idInterno: 
                 hora_checkin: reserva.horaCheckIn,
                 checkout: reserva.checkOut,
                 hora_checkout: reserva.horaCheckOut,
-                quant_hospedes: reserva.quantidadeHospedes,
-                quant_adt: reserva.quantidadeAdultos,
-                quant_chd: reserva.quantidadeCriancas,
-                quant_inf: reserva.quantidadeInfantil,
+                quantidade_de_hospedes: reserva.quantidadeHospedes,
+                quantidade_adt: reserva.quantidadeAdultos,
+                quantidade_chd: reserva.quantidadeCriancas,
+                quantidade_inf: reserva.quantidadeInfantil,
                 moeda: reserva.moeda,
                 valor_total: reserva.valorTotal,
                 total_pago: reserva.totalPago,
-                pendente_quitacao: reserva.pendenteQuitacao,
+                pendente_quitacao_1: reserva.pendenteQuitacao,
                 total_taxas_extras: reserva.totalTaxasExtras,
-                quant_diarias: reserva.quantidadeDiarias,
+                quantidade_de_diarias: reserva.quantidadeDiarias,
                 partnercode: reserva.partnerCode,
-                id_imovel_stays: reserva.idImovelStays,
-                origem: reserva.origem,
+                id_imovel_stays_1: reserva.idImovelStays,
+                origem_canal: reserva.origem,
                 status: reserva.status,
-                condominio: reserva.condominio,
-                regiao: reserva.regiao,
+                condominio_1: reserva.condominio,
+                regiao_1: reserva.regiao,
                 imovel_oficial_sku: reserva.imovelOficialSku,
-                observacao: reserva.observacao,
-                link_stays_1: reserva.linkStays,
+                observacoes: reserva.observacao,
+                link_stays_2: reserva.linkStays,
                 agente: agenteIdJestor,
-                canal_1: canalIdJestor,
-                imovel: imovelIdJestor,
+                canal: canalIdJestor,
+                apartamento: imovelIdJestor,
             }
         };
-
-        if (agenteIdJestor) data.agente = agenteIdJestor;
-        if (canalIdJestor) data.canal_1 = canalIdJestor;
-        if (imovelIdJestor) data.imovel = imovelIdJestor;
-
 
         // 🚀 Envia a solicitação de atualização ao Jestor
         const response = await jestorClient.post(ENDPOINT_UPDATE, data);

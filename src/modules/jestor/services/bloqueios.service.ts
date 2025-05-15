@@ -8,7 +8,7 @@ import { logDebug } from '../../../utils/logger';
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_BLOQUEIO = 'e0bldzqfovxjs42u67wqk';
+const JESTOR_TB_BLOQUEIO = 'de73ef4153629b84eaa28';
 
 /**
  * Consulta o Jestor para verificar se o bloqueio existe e, se sim, retorna o ID interno.
@@ -19,7 +19,7 @@ export async function obterIdInternoBloqueioNoJestor(idExterno: string) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_BLOQUEIO,
-            filters: [{ field: 'idexterno_1', value: idExterno, operator: '==' }],
+            filters: [{ field: 'id_externo', value: idExterno, operator: '==' }],
         });
 
         const items = response.data?.data?.items;
@@ -44,17 +44,16 @@ export async function obterIdInternoBloqueioNoJestor(idExterno: string) {
 export async function inserirBloqueioNoJestor(bloqueio: typeBloqueio, imovelIdJestor?: number) {
     try {
         const data: Record<string, any> = {
-            idapi: bloqueio.id,
-            idexterno_1: bloqueio.idExterno,
-            localizador: bloqueio.localizador,
-            checkin_1: bloqueio.checkIn,
-            checkout_1: bloqueio.checkOut,
-            horacheckin: bloqueio.horaCheckIn,
-            horacheckout: bloqueio.horaCheckOut,
-            notainterna: bloqueio.notaInterna,
+            id_bd_engnet: bloqueio.id,
+            id_externo: bloqueio.idExterno,
+            name: bloqueio.localizador,
+            checkin: bloqueio.checkIn,
+            checkout: bloqueio.checkOut,
+            hora_checkin: bloqueio.horaCheckIn,
+            hora_checkout: bloqueio.horaCheckOut,
+            nota_interna: bloqueio.notaInterna,
             imovelid: bloqueio.imovelId,
-            imovel: bloqueio.imovelId,
-            imovel_1: imovelIdJestor,
+            apartamento: imovelIdJestor,
             status: bloqueio.status,
         };
 
@@ -89,17 +88,16 @@ export async function atualizarBloqueioNoJestor(bloqueio: typeBloqueio, idIntern
             object_type: JESTOR_TB_BLOQUEIO,
             data: {
                 [`id_${JESTOR_TB_BLOQUEIO}`]: idInterno, // ID interno obrigatório
-                idapi: bloqueio.id,
-                idexterno_1: bloqueio.idExterno,
-                localizador: bloqueio.localizador,
-                checkin_1: bloqueio.checkIn,
-                checkout_1: bloqueio.checkOut,
-                horacheckin: bloqueio.horaCheckIn,
-                horacheckout: bloqueio.horaCheckOut,
-                notainterna: bloqueio.notaInterna,
+                id_bd_engnet: bloqueio.id,
+                id_externo: bloqueio.idExterno,
+                name: bloqueio.localizador,
+                checkin: bloqueio.checkIn,
+                checkout: bloqueio.checkOut,
+                hora_checkin: bloqueio.horaCheckIn,
+                hora_checkout: bloqueio.horaCheckOut,
+                nota_interna: bloqueio.notaInterna,
                 imovelid: bloqueio.imovelId,
-                imovel: bloqueio.imovelId,
-                imovel_1: imovelIdJestor,
+                apartamento: imovelIdJestor,
                 status: bloqueio.status,
             },
         };

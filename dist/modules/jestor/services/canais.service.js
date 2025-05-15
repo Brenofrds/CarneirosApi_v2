@@ -23,7 +23,7 @@ const logger_1 = require("../../../utils/logger");
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_CANAL = '1gr5oeddpkkkxjula510g';
+const JESTOR_TB_CANAL = 'd062e04caa41e8cce1c73';
 /**
  * Consulta o Jestor para verificar se o canal existe e, se sim, retorna o ID interno.
  * @param idExterno - O ID externo do canal.
@@ -35,7 +35,7 @@ function obterIdInternoCanalNoJestor(idExterno) {
         try {
             const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_CANAL,
-                filters: [{ field: 'idexterno', value: idExterno, operator: '==' }],
+                filters: [{ field: 'codigo', value: idExterno, operator: '==' }],
             });
             const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
             if (Array.isArray(items) && items.length > 0) {
@@ -59,9 +59,9 @@ function inserirCanalNoJestor(canal) {
         var _a;
         try {
             const data = {
-                idbdapi: canal.id,
-                idexterno: canal.idExterno,
-                titulo: canal.titulo,
+                id_bd_engnet: canal.id,
+                codigo: canal.idExterno,
+                name: canal.titulo,
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
                 object_type: JESTOR_TB_CANAL,
@@ -90,7 +90,7 @@ function atualizarCanalNoJestor(canal, idInterno) {
                 object_type: JESTOR_TB_CANAL,
                 data: {
                     [`id_${JESTOR_TB_CANAL}`]: idInterno,
-                    titulo: canal.titulo,
+                    name: canal.titulo,
                 }
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_UPDATE, data);

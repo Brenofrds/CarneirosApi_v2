@@ -23,8 +23,7 @@ const database_1 = __importDefault(require("../../../config/database"));
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_TAXARESERVA = '7l02yg9daf48d5cfmzbsm';
-const JESTOR_TB_RESERVA = 'e4sqtj0lt_yjxd075da5t';
+const JESTOR_TB_TAXARESERVA = 'nilxosn73_05mr38wy28l';
 /**
  * Consulta o Jestor para verificar se a taxa de reserva existe e, se sim, retorna o ID interno.
  *
@@ -39,8 +38,8 @@ function obterIdInternoTaxaReservaNoJestor(id, nome) {
             const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_TAXARESERVA,
                 filters: [
-                    { field: 'idbdapi', value: id, operator: '==' },
-                    { field: 'nometaxa', value: nome, operator: '==' },
+                    { field: 'id_bd_engnet', value: id, operator: '==' },
+                    { field: 'name', value: nome, operator: '==' },
                 ],
             });
             const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
@@ -66,11 +65,11 @@ function inserirTaxaReservaNoJestor(taxaReserva, reservaIdJestor) {
         var _a;
         try {
             const data = {
-                idbdapi: taxaReserva.id,
-                reservaid: taxaReserva.reservaId,
-                nometaxa: taxaReserva.name,
+                id_bd_engnet: taxaReserva.id,
+                reserva_id: taxaReserva.reservaId,
+                name: taxaReserva.name,
                 valor: taxaReserva.valor,
-                testengnet_reservas: reservaIdJestor,
+                reserva: reservaIdJestor,
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
                 object_type: JESTOR_TB_TAXARESERVA,

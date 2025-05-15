@@ -10,7 +10,7 @@ import { logDebug } from '../../../utils/logger';
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_CANAL = '1gr5oeddpkkkxjula510g';
+const JESTOR_TB_CANAL = 'd062e04caa41e8cce1c73';
 
 /**
  * Consulta o Jestor para verificar se o canal existe e, se sim, retorna o ID interno.
@@ -21,7 +21,7 @@ export async function obterIdInternoCanalNoJestor(idExterno: string) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_CANAL,
-            filters: [{ field: 'idexterno', value: idExterno, operator: '==' }],
+            filters: [{ field: 'codigo', value: idExterno, operator: '==' }],
         });
 
         const items = response.data?.data?.items;
@@ -46,9 +46,9 @@ export async function obterIdInternoCanalNoJestor(idExterno: string) {
 export async function inserirCanalNoJestor(canal: typeCanal) {
     try {
         const data: Record<string, any> = {
-            idbdapi: canal.id,
-            idexterno: canal.idExterno,
-            titulo: canal.titulo,
+            id_bd_engnet: canal.id,
+            codigo: canal.idExterno,
+            name: canal.titulo,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -78,7 +78,7 @@ export async function atualizarCanalNoJestor(canal: typeCanal, idInterno: string
             object_type: JESTOR_TB_CANAL,
             data: {
                 [`id_${JESTOR_TB_CANAL}`]: idInterno,
-                titulo: canal.titulo,
+                name: canal.titulo,
             }
         };
 

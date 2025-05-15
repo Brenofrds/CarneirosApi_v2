@@ -22,7 +22,7 @@ const logger_1 = require("../../../utils/logger");
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_BLOQUEIO = 'e0bldzqfovxjs42u67wqk';
+const JESTOR_TB_BLOQUEIO = 'de73ef4153629b84eaa28';
 /**
  * Consulta o Jestor para verificar se o bloqueio existe e, se sim, retorna o ID interno.
  * @param idExterno - O ID externo do bloqueio.
@@ -34,7 +34,7 @@ function obterIdInternoBloqueioNoJestor(idExterno) {
         try {
             const response = yield jestorClient_1.default.post(ENDPOINT_LIST, {
                 object_type: JESTOR_TB_BLOQUEIO,
-                filters: [{ field: 'idexterno_1', value: idExterno, operator: '==' }],
+                filters: [{ field: 'id_externo', value: idExterno, operator: '==' }],
             });
             const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
             if (Array.isArray(items) && items.length > 0) {
@@ -58,17 +58,16 @@ function inserirBloqueioNoJestor(bloqueio, imovelIdJestor) {
         var _a;
         try {
             const data = {
-                idapi: bloqueio.id,
-                idexterno_1: bloqueio.idExterno,
-                localizador: bloqueio.localizador,
-                checkin_1: bloqueio.checkIn,
-                checkout_1: bloqueio.checkOut,
-                horacheckin: bloqueio.horaCheckIn,
-                horacheckout: bloqueio.horaCheckOut,
-                notainterna: bloqueio.notaInterna,
+                id_bd_engnet: bloqueio.id,
+                id_externo: bloqueio.idExterno,
+                name: bloqueio.localizador,
+                checkin: bloqueio.checkIn,
+                checkout: bloqueio.checkOut,
+                hora_checkin: bloqueio.horaCheckIn,
+                hora_checkout: bloqueio.horaCheckOut,
+                nota_interna: bloqueio.notaInterna,
                 imovelid: bloqueio.imovelId,
-                imovel: bloqueio.imovelId,
-                imovel_1: imovelIdJestor,
+                apartamento: imovelIdJestor,
                 status: bloqueio.status,
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
@@ -99,17 +98,16 @@ function atualizarBloqueioNoJestor(bloqueio, idInterno, imovelIdJestor) {
                 object_type: JESTOR_TB_BLOQUEIO,
                 data: {
                     [`id_${JESTOR_TB_BLOQUEIO}`]: idInterno, // ID interno obrigatório
-                    idapi: bloqueio.id,
-                    idexterno_1: bloqueio.idExterno,
-                    localizador: bloqueio.localizador,
-                    checkin_1: bloqueio.checkIn,
-                    checkout_1: bloqueio.checkOut,
-                    horacheckin: bloqueio.horaCheckIn,
-                    horacheckout: bloqueio.horaCheckOut,
-                    notainterna: bloqueio.notaInterna,
+                    id_bd_engnet: bloqueio.id,
+                    id_externo: bloqueio.idExterno,
+                    name: bloqueio.localizador,
+                    checkin: bloqueio.checkIn,
+                    checkout: bloqueio.checkOut,
+                    hora_checkin: bloqueio.horaCheckIn,
+                    hora_checkout: bloqueio.horaCheckOut,
+                    nota_interna: bloqueio.notaInterna,
                     imovelid: bloqueio.imovelId,
-                    imovel: bloqueio.imovelId,
-                    imovel_1: imovelIdJestor,
+                    apartamento: imovelIdJestor,
                     status: bloqueio.status,
                 },
             };

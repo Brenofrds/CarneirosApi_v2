@@ -8,39 +8,45 @@ import prisma from '../../../config/database';
 const ENDPOINT_LIST = '/object/list';
 const ENDPOINT_CREATE = '/object/create';
 const ENDPOINT_UPDATE = '/object/update';
-const JESTOR_TB_HOSPEDE = 'b_d6pu1giq_jb0gd7f0ed';
+const JESTOR_TB_HOSPEDE = '9ojuwm9mwun5ik__gkp21';
 
 /**
  * Consulta o Jestor para verificar se o hóspede existe e, se sim, retorna o ID interno.
+ * Tenta primeiro buscar por idExterno; se não encontrar, busca pelo nome.
  * 
  * @param nome - Nome completo do hóspede.
  * @param idExterno - O ID externo do hóspede.
- * @param reservaId - O ID da reserva associada.
  * @returns - O ID interno do Jestor ou null se o hóspede não existir.
  */
-export async function obterIdInternoHospedeNoJestor(nome: string, idExterno: string | null, reservaId: number) {
+export async function obterIdInternoHospedeNoJestor(nome: string, idExterno: string | null): Promise<string | null> {
     try {
-        const filters: any[] = [
-            { field: 'nomecompleto', value: nome, operator: '==' },
-            { field: 'id_reserva', value: reservaId, operator: '==' }
-        ];
+        // 1. Buscar pelo idExterno, se fornecido
+        if (idExterno) {
+            const responseId = await jestorClient.post(ENDPOINT_LIST, {
+                object_type: JESTOR_TB_HOSPEDE,
+                filters: [{ field: 'idexterno', value: idExterno, operator: '==' }],
+            });
 
-        if (idExterno) { 
-            filters.push({ field: 'idexterno', value: idExterno, operator: '==' });
+            const itemsId = responseId.data?.data?.items;
+            if (Array.isArray(itemsId) && itemsId.length > 0) {
+                const idInterno = itemsId[0][`id_${JESTOR_TB_HOSPEDE}`];
+                return idInterno ?? null;
+            }
         }
 
-        const response = await jestorClient.post(ENDPOINT_LIST, {
+        // 2. Se não encontrou pelo idExterno, buscar pelo nome
+        const responseNome = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_HOSPEDE,
-            filters,
+            filters: [{ field: 'name', value: nome, operator: '==' }],
         });
 
-        const items = response.data?.data?.items;
-
-        if (Array.isArray(items) && items.length > 0) {
-            const idInterno = items[0][`id_${JESTOR_TB_HOSPEDE}`];
+        const itemsNome = responseNome.data?.data?.items;
+        if (Array.isArray(itemsNome) && itemsNome.length > 0) {
+            const idInterno = itemsNome[0][`id_${JESTOR_TB_HOSPEDE}`];
             return idInterno ?? null;
         }
 
+        // 3. Não encontrou nenhum resultado
         return null;
 
     } catch (error: any) {
@@ -50,6 +56,7 @@ export async function obterIdInternoHospedeNoJestor(nome: string, idExterno: str
     }
 }
 
+
 /**
  * Insere um hóspede no Jestor.
  * @param hospede - Dados do hóspede a serem inseridos.
@@ -57,17 +64,17 @@ export async function obterIdInternoHospedeNoJestor(nome: string, idExterno: str
 export async function inserirHospedeNoJestor(hospede: typeHospede, reservaIdJestor?: number) {
     try {
         const data: Record<string, any> = {
-            name: hospede.id,
+            id_bd_engnet: hospede.id,
             idexterno: hospede.idExterno,
-            nomecompleto: hospede.nomeCompleto,
+            name: hospede.nomeCompleto,
             email: hospede.email,
-            datanascimento: hospede.dataDeNascimento,
+            data_de_nascimento: hospede.dataDeNascimento,
             idade: hospede.idade,
             telefone: hospede.telefone,
             cpf: hospede.cpf,
             documento: hospede.documento,
-            id_reserva: hospede.reservaId,
-            reserva_1: reservaIdJestor,
+            idreserva: hospede.reservaId,
+            reserva: reservaIdJestor,
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
@@ -96,22 +103,23 @@ export async function atualizarHospedeNoJestor(hospede: typeHospede, idInterno: 
         const data: Record<string, any> = {
             object_type: JESTOR_TB_HOSPEDE,
             data: {
-                [`id_${JESTOR_TB_HOSPEDE}`]: idInterno, // Campo obrigatório do ID interno
-                nomecompleto: hospede.nomeCompleto,
+                [`id_${JESTOR_TB_HOSPEDE}`]: idInterno,
+                id_bd_engnet: hospede.id,
+                idexterno: hospede.idExterno,
+                name: hospede.nomeCompleto,
                 email: hospede.email,
-                datanascimento: hospede.dataDeNascimento,
+                data_de_nascimento: hospede.dataDeNascimento,
+                idade: hospede.idade,
                 telefone: hospede.telefone,
                 cpf: hospede.cpf,
                 documento: hospede.documento,
-                id_reserva: hospede.reservaId,
-                reserva_1: reservaIdJestor,
+                idreserva: hospede.reservaId,
+                reserva: reservaIdJestor,
             }
         };
 
-        // 🚀 Envia a solicitação de atualização ao Jestor
         const response = await jestorClient.post(ENDPOINT_UPDATE, data);
 
-        // ✅ Log simplificado apenas com o status e o nome do hóspede atualizado
         if (response.data?.status) {
             logDebug('Hóspede', `🔹 Hóspede ${hospede.nomeCompleto} atualizado com sucesso no Jestor!`);
         } else {
@@ -133,7 +141,7 @@ export async function atualizarHospedeNoJestor(hospede: typeHospede, idInterno: 
 export async function sincronizarHospede(hospede: typeHospede, reservaIdJestor?: number) {
     try {
         // 📥 Tenta obter o ID interno do hóspede no Jestor
-        const idInterno = await obterIdInternoHospedeNoJestor(hospede.nomeCompleto, hospede.idExterno, hospede.reservaId);
+        const idInterno = await obterIdInternoHospedeNoJestor(hospede.nomeCompleto, hospede.idExterno);
 
         if (!idInterno) {
             await inserirHospedeNoJestor(hospede, reservaIdJestor);
