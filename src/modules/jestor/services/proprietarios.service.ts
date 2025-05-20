@@ -17,8 +17,24 @@ const JESTOR_TB_PROPRIETARIO = 'a3672133a5950a31442d1';
  * @param telefone - Telefone do proprietário.
  * @returns - O ID interno do Jestor ou null se o proprietário não existir.
  */
-export async function obterIdInternoProprietarioNoJestor(nome: string, telefone: string | null) {
+export async function obterIdInternoProprietarioNoJestor(nome: string, id: number | null) {
     try {
+
+        // 1. Buscar pelo idExterno, se fornecido
+        if (id) {
+            const responseId = await jestorClient.post(ENDPOINT_LIST, {
+                object_type: JESTOR_TB_PROPRIETARIO,
+                filters: [{ field: 'id_bd_engnet', value: id, operator: '==' }],
+            });
+
+            const itemsId = responseId.data?.data?.items;
+            if (Array.isArray(itemsId) && itemsId.length > 0) {
+                const idInterno = itemsId[0][`id_${JESTOR_TB_PROPRIETARIO}`];
+                return idInterno ?? null;
+            }
+        }
+
+
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_PROPRIETARIO,
             filters: [
@@ -111,7 +127,7 @@ export async function sincronizarProprietario(proprietario: typeProprietario): P
       let idInterno: number | null = proprietario.jestorId || null;
   
       if (!idInterno) {
-        idInterno = await obterIdInternoProprietarioNoJestor(proprietario.nome, proprietario.telefone);
+        idInterno = await obterIdInternoProprietarioNoJestor(proprietario.nome, proprietario.id);
       }
   
       if (!idInterno) {

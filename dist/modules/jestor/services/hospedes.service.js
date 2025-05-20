@@ -110,7 +110,7 @@ function inserirHospedeNoJestor(hospede, reservaIdJestor) {
  */
 function atualizarHospedeNoJestor(hospede, idInterno, reservaIdJestor) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
+        var _a, _b, _c;
         try {
             const data = {
                 object_type: JESTOR_TB_HOSPEDE,
@@ -139,7 +139,9 @@ function atualizarHospedeNoJestor(hospede, idInterno, reservaIdJestor) {
             return response.data;
         }
         catch (error) {
-            const errorMessage = ((_b = error === null || error === void 0 ? void 0 : error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message || 'Erro desconhecido';
+            const errorMessage = typeof ((_b = error === null || error === void 0 ? void 0 : error.response) === null || _b === void 0 ? void 0 : _b.data) === 'string'
+                ? error.response.data
+                : JSON.stringify(((_c = error === null || error === void 0 ? void 0 : error.response) === null || _c === void 0 ? void 0 : _c.data) || error.message || 'Erro desconhecido');
             (0, logger_1.logDebug)('Erro', `❌ Erro ao atualizar hóspede ${hospede.nomeCompleto} no Jestor: ${errorMessage}`);
             throw new Error(`Erro ao atualizar hóspede ${hospede.nomeCompleto} no Jestor`);
         }

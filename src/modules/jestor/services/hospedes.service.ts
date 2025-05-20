@@ -129,7 +129,9 @@ export async function atualizarHospedeNoJestor(hospede: typeHospede, idInterno: 
         return response.data;
 
     } catch (error: any) {
-        const errorMessage = error?.response?.data || error.message || 'Erro desconhecido';
+        const errorMessage = typeof error?.response?.data === 'string'
+            ? error.response.data
+            : JSON.stringify(error?.response?.data || error.message || 'Erro desconhecido');
         logDebug('Erro', `❌ Erro ao atualizar hóspede ${hospede.nomeCompleto} no Jestor: ${errorMessage}`);        
         throw new Error(`Erro ao atualizar hóspede ${hospede.nomeCompleto} no Jestor`);
     }
