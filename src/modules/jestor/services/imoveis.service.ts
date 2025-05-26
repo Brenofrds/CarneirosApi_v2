@@ -60,6 +60,7 @@ export async function inserirImovelNoJestor(imovel: typeImovel, condominioIdJest
             proprietario_id: imovel.proprietarioId || null, // ✅ Agora enviamos também o ID do proprietário
             condominio: condominioIdJestor || null, 
             proprietario: proprietarioIdJestor || null,
+            etapas_captacao: "Nova Captação",
         };
 
         const response = await jestorClient.post(ENDPOINT_CREATE, {
