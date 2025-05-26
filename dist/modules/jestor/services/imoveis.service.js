@@ -74,6 +74,7 @@ function inserirImovelNoJestor(imovel, condominioIdJestor, proprietarioIdJestor)
                 proprietario_id: imovel.proprietarioId || null, // ✅ Agora enviamos também o ID do proprietário
                 condominio: condominioIdJestor || null,
                 proprietario: proprietarioIdJestor || null,
+                etapas_captacao: "Nova Captação",
             };
             const response = yield jestorClient_1.default.post(ENDPOINT_CREATE, {
                 object_type: JESTOR_TB_IMOVEL,
