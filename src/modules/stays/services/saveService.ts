@@ -155,10 +155,18 @@ export async function salvarImovel(imovel: ImovelDetalhado, condominioIdJestor?:
   let proprietarioId: number | null = null;
   let proprietarioIdJestor: number | null = null;
 
-  if (imovel.owner) {
-    const proprietarioSalvo = await salvarProprietario(imovel.owner.nome, imovel.owner.telefone);
-    proprietarioId = proprietarioSalvo.id;
-    proprietarioIdJestor = proprietarioSalvo.jestorId;
+  if (imovel.owner?.nome) {
+    try {
+      const proprietarioSalvo = await salvarProprietario(imovel.owner.nome, imovel.owner.telefone);
+      proprietarioId = proprietarioSalvo.id;
+      proprietarioIdJestor = proprietarioSalvo.jestorId;
+    } catch (error: any) {
+      const msg = error.message || 'Erro desconhecido';
+      logDebug('Erro', `❌ Erro ao salvar proprietário do imóvel ${imovel._id}: ${msg}`);
+      await registrarErroJestor('proprietario', imovel._id, msg);
+    }
+  } else {
+    logDebug('Proprietario', `⚠️ Proprietário do imóvel ${imovel._id} está sem nome. Ignorando salvamento.`);
   }
 
   let jestorIdAtualizado: number | null = imovelExistente?.jestorId ?? null;

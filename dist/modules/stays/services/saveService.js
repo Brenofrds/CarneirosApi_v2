@@ -151,18 +151,28 @@ function salvarReserva(reserva) {
 }
 function salvarImovel(imovel, condominioIdJestor) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c;
+        var _a, _b, _c, _d;
         const imovelExistente = yield database_1.default.imovel.findUnique({
             where: { idExterno: imovel._id },
         });
         let proprietarioId = null;
         let proprietarioIdJestor = null;
-        if (imovel.owner) {
-            const proprietarioSalvo = yield salvarProprietario(imovel.owner.nome, imovel.owner.telefone);
-            proprietarioId = proprietarioSalvo.id;
-            proprietarioIdJestor = proprietarioSalvo.jestorId;
+        if ((_a = imovel.owner) === null || _a === void 0 ? void 0 : _a.nome) {
+            try {
+                const proprietarioSalvo = yield salvarProprietario(imovel.owner.nome, imovel.owner.telefone);
+                proprietarioId = proprietarioSalvo.id;
+                proprietarioIdJestor = proprietarioSalvo.jestorId;
+            }
+            catch (error) {
+                const msg = error.message || 'Erro desconhecido';
+                (0, logger_1.logDebug)('Erro', `❌ Erro ao salvar proprietário do imóvel ${imovel._id}: ${msg}`);
+                yield (0, erro_service_1.registrarErroJestor)('proprietario', imovel._id, msg);
+            }
         }
-        let jestorIdAtualizado = (_a = imovelExistente === null || imovelExistente === void 0 ? void 0 : imovelExistente.jestorId) !== null && _a !== void 0 ? _a : null;
+        else {
+            (0, logger_1.logDebug)('Proprietario', `⚠️ Proprietário do imóvel ${imovel._id} está sem nome. Ignorando salvamento.`);
+        }
+        let jestorIdAtualizado = (_b = imovelExistente === null || imovelExistente === void 0 ? void 0 : imovelExistente.jestorId) !== null && _b !== void 0 ? _b : null;
         const normalizarTexto = (texto) => (texto === null || texto === void 0 ? void 0 : texto.trim().toLowerCase()) || '';
         const normalizarNumero = (num) => (num === undefined ? null : num);
         const precisaAtualizar = !imovelExistente ||
@@ -199,7 +209,7 @@ function salvarImovel(imovel, condominioIdJestor) {
             }
             return {
                 id: imovelExistente.id,
-                sku: (_b = imovelExistente.sku) !== null && _b !== void 0 ? _b : null,
+                sku: (_c = imovelExistente.sku) !== null && _c !== void 0 ? _c : null,
                 jestorId: jestorIdAtualizado !== null && jestorIdAtualizado !== void 0 ? jestorIdAtualizado : null,
             };
         }
@@ -248,7 +258,7 @@ function salvarImovel(imovel, condominioIdJestor) {
         }
         return {
             id: imovelSalvo.id,
-            sku: (_c = imovelSalvo.sku) !== null && _c !== void 0 ? _c : null,
+            sku: (_d = imovelSalvo.sku) !== null && _d !== void 0 ? _d : null,
             jestorId: jestorIdAtualizado !== null && jestorIdAtualizado !== void 0 ? jestorIdAtualizado : null,
         };
     });
