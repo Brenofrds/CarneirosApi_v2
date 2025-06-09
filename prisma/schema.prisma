@@ -40,14 +40,14 @@ model Reserva {
   idExterno            String    @unique
   dataDaCriacao        String
   checkIn              String
-  horaCheckIn          String
+  horaCheckIn          String?
   checkOut             String
-  horaCheckOut         String
-  quantidadeHospedes   Int
-  quantidadeAdultos    Int
-  quantidadeCriancas   Int
-  quantidadeInfantil   Int
-  moeda                String
+  horaCheckOut         String?
+  quantidadeHospedes   Int?
+  quantidadeAdultos    Int?
+  quantidadeCriancas   Int?
+  quantidadeInfantil   Int?
+  moeda                String?
   valorTotal           Float
   totalPago            Float
   pendenteQuitacao     Float

@@ -14,16 +14,14 @@ const JESTOR_TB_RESERVA = 'b03f6af310a8f26667439';
  * Consulta o Jestor para verificar se a reserva existe e, se sim, retorna o ID interno.
  * 
  * @param localizador - O localizador da reserva.
- * @param idExterno - O ID externo da reserva.
  * @returns - O ID interno do Jestor ou null se a reserva não existir.
  */
-export async function obterIdInternoNoJestor(localizador: string, idExterno: string) {
+export async function obterIdInternoNoJestor(localizador: string) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_RESERVA,
             filters: [
                 { field: 'name', value: localizador, operator: '==' },
-                { field: 'id_externo', value: idExterno, operator: '==' },
             ],
         });
 
@@ -41,6 +39,7 @@ export async function obterIdInternoNoJestor(localizador: string, idExterno: str
         throw new Error('Erro ao buscar reserva no Jestor');
     }
 }
+
 
 /**
  * Insere uma reserva no Jestor.
@@ -177,7 +176,7 @@ export async function sincronizarReserva(reserva: typeReserva, agenteIdJestor?: 
 
         // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
         if (!idInterno) {
-            idInterno = await obterIdInternoNoJestor(reserva.localizador, reserva.idExterno);
+            idInterno = await obterIdInternoNoJestor(reserva.localizador);
         }
     
         if (!idInterno) {

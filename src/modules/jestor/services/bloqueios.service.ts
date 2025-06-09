@@ -12,14 +12,14 @@ const JESTOR_TB_BLOQUEIO = 'de73ef4153629b84eaa28';
 
 /**
  * Consulta o Jestor para verificar se o bloqueio existe e, se sim, retorna o ID interno.
- * @param idExterno - O ID externo do bloqueio.
+ * @param localizador - O localizador do bloqueio (armazenado no campo "name").
  * @returns - O ID interno do Jestor ou null se o bloqueio não existir.
  */
-export async function obterIdInternoBloqueioNoJestor(idExterno: string) {
+export async function obterIdInternoBloqueioNoJestor(localizador: string) {
     try {
         const response = await jestorClient.post(ENDPOINT_LIST, {
             object_type: JESTOR_TB_BLOQUEIO,
-            filters: [{ field: 'id_externo', value: idExterno, operator: '==' }],
+            filters: [{ field: 'name', value: localizador, operator: '==' }],
         });
 
         const items = response.data?.data?.items;
@@ -36,6 +36,7 @@ export async function obterIdInternoBloqueioNoJestor(idExterno: string) {
         throw new Error('Erro ao buscar bloqueio no Jestor');
     }
 }
+
 
 /**
  * Insere um bloqueio no Jestor.
@@ -126,7 +127,7 @@ export async function sincronizarBloqueio(bloqueio: typeBloqueio, imovelIdJestor
   
       // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
       if (!idInterno) {
-        idInterno = await obterIdInternoBloqueioNoJestor(bloqueio.idExterno);
+        idInterno = await obterIdInternoBloqueioNoJestor(bloqueio.localizador);
       }
   
       // 🚀 Decide entre inserir ou atualizar
