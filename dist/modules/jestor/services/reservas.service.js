@@ -28,10 +28,9 @@ const JESTOR_TB_RESERVA = 'b03f6af310a8f26667439';
  * Consulta o Jestor para verificar se a reserva existe e, se sim, retorna o ID interno.
  *
  * @param localizador - O localizador da reserva.
- * @param idExterno - O ID externo da reserva.
  * @returns - O ID interno do Jestor ou null se a reserva não existir.
  */
-function obterIdInternoNoJestor(localizador, idExterno) {
+function obterIdInternoNoJestor(localizador) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a, _b;
         try {
@@ -39,7 +38,6 @@ function obterIdInternoNoJestor(localizador, idExterno) {
                 object_type: JESTOR_TB_RESERVA,
                 filters: [
                     { field: 'name', value: localizador, operator: '==' },
-                    { field: 'id_externo', value: idExterno, operator: '==' },
                 ],
             });
             const items = (_b = (_a = response.data) === null || _a === void 0 ? void 0 : _a.data) === null || _b === void 0 ? void 0 : _b.items;
@@ -182,7 +180,7 @@ function sincronizarReserva(reserva, agenteIdJestor, canalIdJestor, imovelIdJest
             let idInterno = reserva.jestorId || null;
             // 🔍 Se ainda não temos o ID interno salvo, buscamos no Jestor
             if (!idInterno) {
-                idInterno = yield obterIdInternoNoJestor(reserva.localizador, reserva.idExterno);
+                idInterno = yield obterIdInternoNoJestor(reserva.localizador);
             }
             if (!idInterno) {
                 // 🔼 Inserção no Jestor com o agenteIdJestor e canalIdJestor

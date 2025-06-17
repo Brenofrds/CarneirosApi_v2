@@ -4,7 +4,10 @@ import { salvarReserva, salvarHospede, salvarImovel, salvarCondominio, salvarTax
 import prisma from "../../config/database"; // Importa o cliente Prisma
 import { logDebug } from '../../utils/logger';
 import { sincronizarReserva } from "../jestor/services/reservas.service";
+import { sincronizarBloqueio } from "../jestor/services/bloqueios.service";
 import { typeReserva } from '../jestor/jestor.types'; 
+import { typeBloqueio } from '../jestor/jestor.types'; 
+import { registrarErroStays } from '../database/erro.service'; 
 
 
 /**
@@ -245,7 +248,7 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
     logDebug("Reserva", `Processando status "${novoStatus}" para reserva ${payload._id}`);
 
     // 🔹 Tenta localizar a reserva no banco de dados
-    let reservaExistente = await prisma.reserva.findUnique({ where: { idExterno: payload._id } });
+    const reservaExistente = await prisma.reserva.findUnique({ where: { idExterno: payload._id } });
 
     // ✅ Se a reserva existir, apenas atualiza o status no banco e sincroniza no Jestor
     if (reservaExistente) {
@@ -300,19 +303,52 @@ const processarAtualizacaoStatus = async (payload: any, novoStatus: string) => {
       return reservaAtualizada;
     }
 
-    // 🔴 Se a reserva não existir e o status for "Cancelada", buscamos detalhes na API Stays e processamos a reserva
+    // 🔁 Caso não seja uma reserva, tenta tratar como bloqueio
+    const bloqueioExistente = await prisma.bloqueio.findFirst({
+      where: { idExterno: payload._id },
+    });
+
+    if (bloqueioExistente) {
+      logDebug("Bloqueio", `🔄 Atualizando status do bloqueio "${payload._id}" para "${novoStatus}"...`);
+
+      const bloqueioAtualizado = await prisma.bloqueio.update({
+        where: { id: bloqueioExistente.id },
+        data: {
+          status: novoStatus,
+          sincronizadoNoJestor: false,
+        },
+      });
+
+      // 🔄 Converte para o formato esperado por `sincronizarBloqueio`
+      const bloqueioParaSincronizar: typeBloqueio = {
+        id: bloqueioAtualizado.id,
+        idExterno: bloqueioAtualizado.idExterno,
+        localizador: bloqueioAtualizado.localizador,
+        checkIn: bloqueioAtualizado.checkIn,
+        horaCheckIn: bloqueioAtualizado.horaCheckIn ?? null,
+        checkOut: bloqueioAtualizado.checkOut,
+        horaCheckOut: bloqueioAtualizado.horaCheckOut ?? null,
+        notaInterna: bloqueioAtualizado.notaInterna ?? null,
+        imovelId: bloqueioAtualizado.imovelId ?? null,
+        status: bloqueioAtualizado.status ?? null,
+        jestorId: bloqueioAtualizado.jestorId ?? null,
+      };
+
+      // 🔄 Dispara sincronização com Jestor, se disponível
+      await sincronizarBloqueio(bloqueioParaSincronizar);
+
+      logDebug("Bloqueio", `✅ Bloqueio "${payload._id}" atualizado com sucesso.`);
+      return bloqueioAtualizado;
+    }
+
     if (novoStatus === "Cancelada") {
-      console.warn(`⚠️ Reserva ${payload._id} não encontrada no banco. Buscando detalhes na API Stays...`);
-
-      // 📡 Buscar detalhes da reserva na API Stays
-      const detalhesReserva = await fetchReservaDetalhada(payload._id);
-
-      if (!detalhesReserva) {
-        throw new Error(`Erro: Detalhes da reserva ${payload._id} não encontrados na API.`);
-      }
-
-      // 🔄 Processar a reserva usando a função principal que já salva no banco e no Jestor
-      return await processarReservaWebhook(detalhesReserva);
+      await registrarErroStays(
+        "reservation.canceled",
+        payload._id,
+        "Cancelada recebida mas entidade não encontrada.",
+        payload
+      );
+      return;
     }
 
     // 🚫 Se o status for "Deletada" e a reserva não existir, **não faz nada** (a reserva foi realmente deletada)
